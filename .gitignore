@@ -1,0 +1,10 @@
+# build files
+.pio
+
+# IDE files
+.vscode
+
+# OS files
+*.DS_Store
+Thumbs.db
+.local
