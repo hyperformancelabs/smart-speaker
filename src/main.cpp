@@ -10,22 +10,32 @@
 #include <math.h>
 #include "secrets.h"
 
+// --- Pin Mapping ---
+
+// OLED (I2C)
 #define PIN_OLED_SDA  21
 #define PIN_OLED_SCL  22
 
+// RFID RC522 (SPI)
 #define PIN_RFID_SS    16
 #define PIN_RFID_RST   17
+// Default SPI: SCK=18, MISO=19, MOSI=23
 
+// INMP441 Microphone (I2S RX)
 #define PIN_MIC_BCLK  26
 #define PIN_MIC_WS    27
 #define PIN_MIC_SD    32
 
+// MAX98357A Amplifier (I2S TX)
 #define PIN_SPK_DIN   25
-#define PIN_SPK_BCLK  26
-#define PIN_SPK_LRC   27
+#define PIN_SPK_BCLK  PIN_MIC_BCLK
+#define PIN_SPK_LRC   PIN_MIC_WS
 #define PIN_AMP_SD    13
 
+// Shared I2S port for RX (mic) and TX (speaker)
 #define I2S_PORT      I2S_NUM_0
+
+// --- Device Configurations ---
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
@@ -47,6 +57,8 @@ MFRC522 rfid(PIN_RFID_SS, PIN_RFID_RST);
 
 WebSocketsServer ws_server(WS_PORT);
 unsigned long last_wifi_retry_ms = 0;
+
+// --- Wi-Fi and WebSocket ---
 
 void wifi_connect() {
     WiFi.mode(WIFI_STA);
@@ -85,6 +97,7 @@ void ws_send_telemetry(const int16_t raw_data[], int raw_len, int card_event, co
     int used = snprintf(msg, sizeof(msg), "{\"raw\":[");
     if (used < 0 || used >= (int)sizeof(msg)) return;
 
+    // Downsample raw audio to keep WebSocket payload size stable.
     int points = min(raw_len, WS_RAW_POINTS);
     for (int i = 0; i < points; i++) {
         int idx = (i * raw_len) / points;
@@ -111,6 +124,8 @@ void ws_send_telemetry(const int16_t raw_data[], int raw_len, int card_event, co
     ws_server.broadcastTXT(msg);
 }
 
+// --- Serial Telemetry ---
+
 void serial_send_plotter(const int16_t raw_data[], int raw_len, int card_event) {
     int points = min(raw_len, SERIAL_RAW_LINES);
     if (points <= 0) {
@@ -127,6 +142,8 @@ void serial_send_plotter(const int16_t raw_data[], int raw_len, int card_event) 
     Serial.print(">card:");
     Serial.println(card_event);
 }
+
+// --- Audio Functions ---
 
 void i2s_init() {
     i2s_config_t cfg = {};
@@ -185,11 +202,14 @@ void read_mic(int16_t raw_out[], int &raw_len) {
     raw_len = bytes_read / 4;
     if (raw_len > MIC_DMA_LEN) raw_len = MIC_DMA_LEN;
 
+    // INMP441 provides 24-bit samples in a 32-bit slot; convert to int16_t.
     for (int i = 0; i < raw_len; i++) {
         int32_t s24 = samples[i] >> 8;
         raw_out[i] = (int16_t)(s24 >> 8);
     }
 }
+
+// --- Display Functions ---
 
 void oled_draw(const int16_t raw_data[], int raw_len, const String &uid) {
     const int wave_left = 0;
@@ -215,6 +235,7 @@ void oled_draw(const int16_t raw_data[], int raw_len, const String &uid) {
     display.drawFastHLine(wave_left + 1, mid, SCREEN_WIDTH - 2, SSD1306_WHITE);
 
     if (raw_len > 1) {
+        // Resample the captured buffer across display width.
         int prev_y = map((long)raw_data[0], -32768, 32767, wave_bottom - 1, wave_top + 1);
         for (int x = 1; x <= wave_right - 1; x++) {
             int idx = ((x - 1) * raw_len) / (SCREEN_WIDTH - 2);
@@ -232,13 +253,17 @@ void oled_draw(const int16_t raw_data[], int raw_len, const String &uid) {
     display.display();
 }
 
+// --- Main Program ---
+
 void setup() {
     Serial.begin(SERIAL_BAUD_RATE);
 
+    // Initial amplifier state
     pinMode(PIN_AMP_SD, OUTPUT);
     digitalWrite(PIN_AMP_SD, LOW);
     delay(200);
 
+    // OLED initialization
     Wire.begin(PIN_OLED_SDA, PIN_OLED_SCL);
     if (display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
         display.clearDisplay();
@@ -246,16 +271,20 @@ void setup() {
         display.setTextColor(SSD1306_WHITE);
     }
 
+    // RFID initialization
     SPI.begin(18, 19, 23, PIN_RFID_SS);
     SPI.setFrequency(1000000);
     rfid.PCD_Init();
 
+    // Audio initialization
     i2s_init();
 
+    // Network and WebSocket initialization
     wifi_connect();
     ws_server.begin();
     ws_server.onEvent(ws_on_event);
 
+    // Enable amplifier and play startup beep
     digitalWrite(PIN_AMP_SD, HIGH);
     delay(50);
     spk_beep(900, 80);
@@ -273,6 +302,7 @@ void loop() {
 
     int card_event = 0;
     if (rfid.PICC_IsNewCardPresent() && rfid.PICC_ReadCardSerial()) {
+        // Format UID as uppercase hex bytes separated by ':'.
         last_uid = "";
         for (byte i = 0; i < rfid.uid.size; i++) {
             if (rfid.uid.uidByte[i] < 0x10) last_uid += "0";

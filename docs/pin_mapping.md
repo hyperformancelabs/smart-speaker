@@ -54,8 +54,8 @@ Hardware configuration for ESP32 with OLED, INMP441, RC522, and MAX98357A module
 | --------- | ------------ | -------------------- |
 | 3.3V      | 3V3          | **Do not use 5V**    |
 | GND       | GND          |                      |
-| RST       | RX2 / GPIO17 | Labeled TX2 on board |
-| SDA / SS  | RX2 / GPIO16 | Labeled RX2 on board |
+| RST       | D17 / GPIO17 | Labeled TX2 on board |
+| SDA / SS  | D16 / GPIO16 | Labeled RX2 on board |
 | SCK       | D18 (GPIO18) |                      |
 | MISO      | D19 (GPIO19) |                      |
 | MOSI      | D23 (GPIO23) |                      |
