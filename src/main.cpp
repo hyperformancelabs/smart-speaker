@@ -10,6 +10,10 @@
 #include <math.h>
 #include "secrets.h"
 
+#ifndef I2S_PIN_NO_CHANGE
+#define I2S_PIN_NO_CHANGE (-1)
+#endif
+
 // --- Pin Mapping ---
 
 // OLED (I2C)
@@ -32,7 +36,7 @@
 #define PIN_SPK_LRC   PIN_MIC_WS
 #define PIN_AMP_SD    13
 
-// Shared I2S port for RX (mic) and TX (speaker)
+// Shared I2S port for microphone capture
 #define I2S_PORT      I2S_NUM_0
 
 // --- Device Configurations ---
@@ -43,20 +47,24 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 MFRC522 rfid(PIN_RFID_SS, PIN_RFID_RST);
 
-#define MIC_SAMPLE_RATE 16000
-#define MIC_DMA_LEN     256
-#define MIC_DMA_CNT     4
+#define MIC_SAMPLE_RATE 16000  // 16k samples/sec
+#define MIC_DMA_LEN     512    // ram buffer length in samples (must be >= frame size)
+#define MIC_DMA_CNT     8      // number of DMA buffers (higher = more latency, more tolerance for blocking operations)
+#define FRAME_SAMPLES   320    // number of samples to send in each WebSocket packet (must be <= DMA buffer length), =20ms @ 16kHz (with 20ms is standard for real-time audio processing)
 
 #define SPK_SAMPLE_RATE 16000
+
 #define SERIAL_BAUD_RATE 115200
 #define SERIAL_RAW_LINES 32
+
 #define WS_PORT          81
-#define WS_RAW_POINTS    24
 #define WIFI_TIMEOUT_MS  15000
 #define WIFI_RETRY_MS    5000
 
 WebSocketsServer ws_server(WS_PORT);
 unsigned long last_wifi_retry_ms = 0;
+bool record_mode = true;  // true: train/record only, false: full demo path
+bool loopback_mode = true; // demo only: play captured mic audio to speaker
 
 // --- Wi-Fi and WebSocket ---
 
@@ -90,38 +98,17 @@ void ws_on_event(uint8_t client_id, WStype_t type, uint8_t *payload, size_t leng
     }
 }
 
-void ws_send_telemetry(const int16_t raw_data[], int raw_len, int card_event, const String &uid) {
-    if (WiFi.status() != WL_CONNECTED) return;
+void ws_send_audio_frame(const int16_t pcm[], int n) {
+    if (WiFi.status() != WL_CONNECTED || n <= 0) return;
 
-    char msg[512];
-    int used = snprintf(msg, sizeof(msg), "{\"raw\":[");
-    if (used < 0 || used >= (int)sizeof(msg)) return;
+    static uint32_t seq = 0;
+    static uint8_t pkt[4 + FRAME_SAMPLES * 2];
 
-    // Downsample raw audio to keep WebSocket payload size stable.
-    int points = min(raw_len, WS_RAW_POINTS);
-    for (int i = 0; i < points; i++) {
-        int idx = (i * raw_len) / points;
-        int written = snprintf(
-            msg + used,
-            sizeof(msg) - used,
-            "%d%s",
-            (int)raw_data[idx],
-            (i == points - 1) ? "" : ","
-        );
-        if (written < 0 || written >= (int)(sizeof(msg) - used)) return;
-        used += written;
-    }
+    memcpy(pkt, &seq, 4);
+    memcpy(pkt + 4, pcm, n * sizeof(int16_t));
+    seq++;
 
-    int written = snprintf(
-        msg + used,
-        sizeof(msg) - used,
-        "],\"card\":%d,\"uid\":\"%s\"}",
-        card_event,
-        uid.c_str()
-    );
-    if (written < 0 || written >= (int)(sizeof(msg) - used)) return;
-
-    ws_server.broadcastTXT(msg);
+    ws_server.broadcastBIN(pkt, 4 + n * sizeof(int16_t));
 }
 
 // --- Serial Telemetry ---
@@ -147,8 +134,11 @@ void serial_send_plotter(const int16_t raw_data[], int raw_len, int card_event) 
 
 void i2s_init() {
     i2s_config_t cfg = {};
-    cfg.mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX | I2S_MODE_RX);
+    cfg.mode = record_mode
+        ? (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX)
+        : (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX | I2S_MODE_RX);
     cfg.sample_rate = MIC_SAMPLE_RATE;
+    cfg.use_apll = true;
     cfg.bits_per_sample = I2S_BITS_PER_SAMPLE_32BIT;
     cfg.channel_format = I2S_CHANNEL_FMT_ONLY_RIGHT;
     cfg.communication_format = I2S_COMM_FORMAT_STAND_I2S;
@@ -160,7 +150,7 @@ void i2s_init() {
     i2s_pin_config_t pin_cfg = {};
     pin_cfg.bck_io_num = PIN_SPK_BCLK;
     pin_cfg.ws_io_num  = PIN_SPK_LRC;
-    pin_cfg.data_out_num = PIN_SPK_DIN;
+    pin_cfg.data_out_num = record_mode ? I2S_PIN_NO_CHANGE : PIN_SPK_DIN;
     pin_cfg.data_in_num  = PIN_MIC_SD;
 
     i2s_driver_uninstall(I2S_PORT);
@@ -189,11 +179,26 @@ void spk_beep(int freq = 1200, int ms = 80) {
     }
 }
 
+void spk_play_mic_loopback(const int16_t pcm[], int n) {
+    if (n <= 0) return;
+
+    // I2S is configured as 32-bit slots; place 16-bit PCM in the high 16 bits.
+    static int32_t tx[MIC_DMA_LEN];
+    if (n > MIC_DMA_LEN) n = MIC_DMA_LEN;
+
+    for (int i = 0; i < n; i++) {
+        tx[i] = ((int32_t)pcm[i]) << 16;
+    }
+
+    size_t bytes_written = 0;
+    i2s_write(I2S_PORT, tx, n * sizeof(int32_t), &bytes_written, portMAX_DELAY);
+}
+
 void read_mic(int16_t raw_out[], int &raw_len) {
     static int32_t samples[MIC_DMA_LEN];
     size_t bytes_read = 0;
 
-    esp_err_t err = i2s_read(I2S_PORT, samples, sizeof(samples), &bytes_read, pdMS_TO_TICKS(50));
+    esp_err_t err = i2s_read(I2S_PORT, samples, sizeof(samples), &bytes_read, portMAX_DELAY);
     if (err != ESP_OK || bytes_read == 0) {
         raw_len = 0;
         return;
@@ -202,10 +207,21 @@ void read_mic(int16_t raw_out[], int &raw_len) {
     raw_len = bytes_read / 4;
     if (raw_len > MIC_DMA_LEN) raw_len = MIC_DMA_LEN;
 
-    // INMP441 provides 24-bit samples in a 32-bit slot; convert to int16_t.
+    const int GAIN = 2; // 1..3 depending on clipping tolerance
+
     for (int i = 0; i < raw_len; i++) {
-        int32_t s24 = samples[i] >> 8;
-        raw_out[i] = (int16_t)(s24 >> 8);
+        int32_t s = samples[i];
+
+        s >>= 8;                       // 32-bit slot -> signed 24-bit
+        s += (s >= 0) ? 0x80 : -0x80;  // rounding before downshifting to 16-bit
+        s >>= 8;                       // 24-bit -> 16-bit
+
+        s *= GAIN;
+
+        if (s > 32767) s = 32767;
+        if (s < -32768) s = -32768;
+
+        raw_out[i] = (int16_t)s;
     }
 }
 
@@ -256,25 +272,33 @@ void oled_draw(const int16_t raw_data[], int raw_len, const String &uid) {
 // --- Main Program ---
 
 void setup() {
-    Serial.begin(SERIAL_BAUD_RATE);
-
-    // Initial amplifier state
-    pinMode(PIN_AMP_SD, OUTPUT);
-    digitalWrite(PIN_AMP_SD, LOW);
-    delay(200);
-
-    // OLED initialization
-    Wire.begin(PIN_OLED_SDA, PIN_OLED_SCL);
-    if (display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
-        display.clearDisplay();
-        display.setTextSize(1);
-        display.setTextColor(SSD1306_WHITE);
+    if (!record_mode) {
+        Serial.begin(SERIAL_BAUD_RATE);
     }
 
-    // RFID initialization
-    SPI.begin(18, 19, 23, PIN_RFID_SS);
-    SPI.setFrequency(1000000);
-    rfid.PCD_Init();
+    if (!record_mode) {
+        // Initial amplifier state
+        pinMode(PIN_AMP_SD, OUTPUT);
+        digitalWrite(PIN_AMP_SD, LOW);
+        delay(200);
+    }
+
+    if (!record_mode) {
+        // OLED initialization
+        Wire.begin(PIN_OLED_SDA, PIN_OLED_SCL);
+        if (display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+            display.clearDisplay();
+            display.setTextSize(1);
+            display.setTextColor(SSD1306_WHITE);
+        }
+    }
+
+    if (!record_mode) {
+        // RFID initialization
+        SPI.begin(18, 19, 23, PIN_RFID_SS);
+        SPI.setFrequency(1000000);
+        rfid.PCD_Init();
+    }
 
     // Audio initialization
     i2s_init();
@@ -284,15 +308,18 @@ void setup() {
     ws_server.begin();
     ws_server.onEvent(ws_on_event);
 
-    // Enable amplifier and play startup beep
-    digitalWrite(PIN_AMP_SD, HIGH);
-    delay(50);
-    spk_beep(900, 80);
+    if (!record_mode) {
+        // Enable amplifier and play startup beep
+        digitalWrite(PIN_AMP_SD, HIGH);
+        delay(50);
+        spk_beep(900, 80);
+    }
 }
 
 void loop() {
-    static String last_uid = "(no card)";
     static int16_t raw_data[MIC_DMA_LEN];
+    static int16_t frame[FRAME_SAMPLES];
+    static int fill = 0;
 
     ws_server.loop();
     wifi_ensure_connected();
@@ -300,28 +327,44 @@ void loop() {
     int raw_len = 0;
     read_mic(raw_data, raw_len);
 
-    int card_event = 0;
-    if (rfid.PICC_IsNewCardPresent() && rfid.PICC_ReadCardSerial()) {
-        // Format UID as uppercase hex bytes separated by ':'.
-        last_uid = "";
-        for (byte i = 0; i < rfid.uid.size; i++) {
-            if (rfid.uid.uidByte[i] < 0x10) last_uid += "0";
-            last_uid += String(rfid.uid.uidByte[i], HEX);
-            if (i != rfid.uid.size - 1) last_uid += ":";
-        }
-        last_uid.toUpperCase();
-
-        card_event = 1;
-        spk_beep(1200, 100);
-
-        rfid.PICC_HaltA();
-        rfid.PCD_StopCrypto1();
+    if (!record_mode && loopback_mode && raw_len > 0) {
+        spk_play_mic_loopback(raw_data, raw_len);
     }
 
-    oled_draw(raw_data, raw_len, last_uid);
+    for (int i = 0; i < raw_len; i++) {
+        frame[fill++] = raw_data[i];
+        if (fill == FRAME_SAMPLES) {
+            ws_send_audio_frame(frame, FRAME_SAMPLES);
+            fill = 0;
+        }
+    }
 
-    ws_send_telemetry(raw_data, raw_len, card_event, last_uid);
-    serial_send_plotter(raw_data, raw_len, card_event);
+    if (!record_mode) {
+        static String last_uid = "(no card)";
+        static unsigned long last_demo_tick = 0;
+        static int pending_card_event = 0;
 
-    delay(20);
+        if (rfid.PICC_IsNewCardPresent() && rfid.PICC_ReadCardSerial()) {
+            // Format UID as uppercase hex bytes separated by ':'.
+            last_uid = "";
+            for (byte i = 0; i < rfid.uid.size; i++) {
+                if (rfid.uid.uidByte[i] < 0x10) last_uid += "0";
+                last_uid += String(rfid.uid.uidByte[i], HEX);
+                if (i != rfid.uid.size - 1) last_uid += ":";
+            }
+            last_uid.toUpperCase();
+            pending_card_event = 1;
+
+            rfid.PICC_HaltA();
+            rfid.PCD_StopCrypto1();
+        }
+
+        unsigned long now = millis();
+        if (now - last_demo_tick >= 200) {
+            oled_draw(raw_data, raw_len, last_uid);
+            serial_send_plotter(raw_data, raw_len, pending_card_event);
+            pending_card_event = 0;
+            last_demo_tick = now;
+        }
+    }
 }
