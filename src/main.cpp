@@ -63,7 +63,7 @@ MFRC522 rfid(PIN_RFID_SS, PIN_RFID_RST);
 
 WebSocketsServer ws_server(WS_PORT);
 unsigned long last_wifi_retry_ms = 0;
-bool record_mode = true;  // true: train/record only, false: full demo path
+bool record_mode = false;  // true: train/record only, false: full demo path
 bool loopback_mode = true; // demo only: play captured mic audio to speaker
 
 // --- Wi-Fi and WebSocket ---
