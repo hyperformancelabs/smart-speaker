@@ -344,7 +344,14 @@ def build_parser() -> argparse.ArgumentParser:
             "PCM as WAV."
         )
     )
-    parser.add_argument("--host", required=True, help="ESP32 hostname or IP address.")
+    parser.add_argument(
+        "--host",
+        required=True,
+        help=(
+            "ESP32 hostname or IP address. Use 192.168.4.1 when the firmware "
+            "runs in Access Point mode."
+        ),
+    )
     parser.add_argument(
         "--port",
         type=int,
