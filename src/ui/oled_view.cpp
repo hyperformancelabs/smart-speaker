@@ -20,11 +20,14 @@ void oledInit() {
     }
 }
 
-void oledDraw(const int16_t rawData[], int rawLen, const String &uid) {
+void oledDraw(const int16_t rawData[], int rawLen, const WakewordInfo &wakeword, const String &uid) {
     const int waveLeft = 0;
     const int waveRight = SCREEN_WIDTH - 1;
     const int waveTop = 20;
     const int waveBottom = 47;
+    const bool recentWakeword =
+        wakeword.lastDetectionMs > 0 &&
+        millis() - wakeword.lastDetectionMs < WAKEWORD_DETECTION_COOLDOWN_MS;
 
     display.clearDisplay();
     display.setCursor(0, 0);
@@ -36,8 +39,17 @@ void oledDraw(const int16_t rawData[], int rawLen, const String &uid) {
     }
 
     display.setCursor(0, 10);
-    display.print("RAW0:");
-    display.println(rawLen > 0 ? rawData[0] : 0);
+    display.print("WW:");
+    if (!wakeword.hasInference) {
+        display.println("warming...");
+    } else if (recentWakeword) {
+        display.print("WAKEUP ");
+        display.println(wakeword.wakeupScore, 2);
+    } else {
+        display.print(wakeword.topLabel);
+        display.print(" ");
+        display.println(wakeword.topScore, 2);
+    }
 
     display.drawRect(waveLeft, waveTop, SCREEN_WIDTH, waveBottom - waveTop + 1, SSD1306_WHITE);
     int mid = (waveTop + waveBottom) / 2;

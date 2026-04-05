@@ -38,6 +38,11 @@ constexpr int MIC_DMA_CNT = 8;
 constexpr int FRAME_SAMPLES = 320;
 
 constexpr int SPK_SAMPLE_RATE = 16000;
+constexpr float WAKEWORD_DETECTION_THRESHOLD = 0.60f;
+constexpr float WAKEWORD_RELEASE_THRESHOLD = 0.35f;
+constexpr unsigned long WAKEWORD_DETECTION_COOLDOWN_MS = 1500;
+constexpr int WAKEWORD_BEEP_FREQ = 1400;
+constexpr int WAKEWORD_BEEP_MS = 70;
 
 constexpr unsigned long SERIAL_BAUD_RATE = 115200;
 constexpr int SERIAL_RAW_LINES = 32;

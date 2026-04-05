@@ -2,5 +2,7 @@
 
 #include <Arduino.h>
 
+#include "app_state.h"
+
 void oledInit();
-void oledDraw(const int16_t rawData[], int rawLen, const String &uid);
+void oledDraw(const int16_t rawData[], int rawLen, const WakewordInfo &wakeword, const String &uid);

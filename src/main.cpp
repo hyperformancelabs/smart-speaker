@@ -7,6 +7,7 @@
 #include "sensors/rfid_service.h"
 #include "ui/oled_view.h"
 #include "ui/serial_telemetry.h"
+#include "wakeword/wakeword_service.h"
 
 namespace {
 AppState app;
@@ -25,6 +26,12 @@ void taskAudioStream() {
     audioFeedWsFrames(app.rawData, app.rawLen);
 }
 
+void taskWakeword() {
+    if (wakewordProcessSamples(app.rawData, app.rawLen, app.wakeword)) {
+        audioBeep(WAKEWORD_BEEP_FREQ, WAKEWORD_BEEP_MS);
+    }
+}
+
 void taskDemoUiAndRfid() {
     int previousCardEvent = app.pendingCardEvent;
     rfidPoll(app.lastUid, app.pendingCardEvent);
@@ -34,7 +41,7 @@ void taskDemoUiAndRfid() {
 
     unsigned long now = millis();
     if (now - app.lastDemoTick >= 200) {
-        oledDraw(app.rawData, app.rawLen, app.lastUid);
+        oledDraw(app.rawData, app.rawLen, app.wakeword, app.lastUid);
         serialSendPlotter(app.rawData, app.rawLen, app.pendingCardEvent);
         app.pendingCardEvent = 0;
         app.lastDemoTick = now;
@@ -49,6 +56,7 @@ void setup() {
     rfidInit();
 
     audioInit();
+    wakewordInit(app.wakeword);
 
     wifiConnect();
     wsBegin();
@@ -62,5 +70,6 @@ void loop() {
     taskNetwork();
     taskAudioCapture();
     taskAudioStream();
+    taskWakeword();
     taskDemoUiAndRfid();
 }

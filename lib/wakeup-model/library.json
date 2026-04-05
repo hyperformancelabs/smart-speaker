@@ -1,0 +1,15 @@
+{
+  "name": "wakeup-model",
+  "version": "0.0.0",
+  "build": {
+    "srcDir": ".",
+    "srcFilter": [
+      "+<edge-impulse-sdk/**>",
+      "+<model-parameters/**>",
+      "+<tflite-model/**>",
+      "-<edge-impulse-sdk/CMSIS/**>",
+      "-<edge-impulse-sdk/porting/**>",
+      "+<edge-impulse-sdk/porting/arduino/**>"
+    ]
+  }
+}
