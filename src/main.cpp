@@ -21,12 +21,6 @@ void taskAudioCapture() {
     audioReadMic(app.rawData, app.rawLen);
 }
 
-void taskAudioLoopback() {
-    if (!app.recordMode && app.loopbackMode && app.rawLen > 0) {
-        audioPlayLoopback(app.rawData, app.rawLen);
-    }
-}
-
 void taskAudioStream() {
     audioFeedWsFrames(app.rawData, app.rawLen);
 }
@@ -69,7 +63,6 @@ void setup() {
 void loop() {
     taskNetwork();
     taskAudioCapture();
-    taskAudioLoopback();
     taskAudioStream();
     taskDemoUiAndRfid();
 }

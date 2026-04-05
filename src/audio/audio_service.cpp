@@ -63,20 +63,6 @@ void audioBeep(int freq, int ms) {
     }
 }
 
-void audioPlayLoopback(const int16_t pcm[], int n) {
-    if (n <= 0) return;
-
-    static int32_t tx[MIC_DMA_LEN];
-    if (n > MIC_DMA_LEN) n = MIC_DMA_LEN;
-
-    for (int i = 0; i < n; i++) {
-        tx[i] = ((int32_t)pcm[i]) << 16;
-    }
-
-    size_t bytesWritten = 0;
-    i2s_write(I2S_PORT, tx, n * sizeof(int32_t), &bytesWritten, portMAX_DELAY);
-}
-
 void audioReadMic(int16_t rawOut[], int &rawLen) {
     static int32_t samples[MIC_DMA_LEN];
     size_t bytesRead = 0;

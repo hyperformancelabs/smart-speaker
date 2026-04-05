@@ -5,7 +5,6 @@
 
 struct AppState {
     bool recordMode = false;
-    bool loopbackMode = true;
     int16_t rawData[MIC_DMA_LEN] = {};
     int rawLen = 0;
     String lastUid = "(no card)";
