@@ -26,9 +26,11 @@ void taskAudioStream() {
 }
 
 void taskDemoUiAndRfid() {
-    if (app.recordMode) return;
-
+    int previousCardEvent = app.pendingCardEvent;
     rfidPoll(app.lastUid, app.pendingCardEvent);
+    if (!previousCardEvent && app.pendingCardEvent) {
+        audioBeep(900, 80);
+    }
 
     unsigned long now = millis();
     if (now - app.lastDemoTick >= 200) {
@@ -41,23 +43,19 @@ void taskDemoUiAndRfid() {
 }
 
 void setup() {
-    if (!app.recordMode) {
-        serialTelemetryBegin();
-        audioPrepareOutput();
-        oledInit();
-        rfidInit();
-    }
+    serialTelemetryBegin();
+    audioPrepareOutput();
+    oledInit();
+    rfidInit();
 
-    audioInit(app.recordMode);
+    audioInit();
 
     wifiConnect();
     wsBegin();
 
-    if (!app.recordMode) {
-        audioEnableOutput();
-        delay(50);
-        audioBeep(900, 80);
-    }
+    audioEnableOutput();
+    delay(50);
+    audioBeep(900, 80);
 }
 
 void loop() {

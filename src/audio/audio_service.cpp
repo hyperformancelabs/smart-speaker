@@ -16,11 +16,9 @@ void audioEnableOutput() {
     digitalWrite(PIN_AMP_SD, HIGH);
 }
 
-void audioInit(bool recordMode) {
+void audioInit() {
     i2s_config_t cfg = {};
-    cfg.mode = recordMode
-        ? (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX)
-        : (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX | I2S_MODE_RX);
+    cfg.mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX | I2S_MODE_RX);
     cfg.sample_rate = MIC_SAMPLE_RATE;
     cfg.use_apll = true;
     cfg.bits_per_sample = I2S_BITS_PER_SAMPLE_32BIT;
@@ -34,7 +32,7 @@ void audioInit(bool recordMode) {
     i2s_pin_config_t pinCfg = {};
     pinCfg.bck_io_num = PIN_SPK_BCLK;
     pinCfg.ws_io_num = PIN_SPK_LRC;
-    pinCfg.data_out_num = recordMode ? I2S_PIN_NO_CHANGE : PIN_SPK_DIN;
+    pinCfg.data_out_num = PIN_SPK_DIN;
     pinCfg.data_in_num = PIN_MIC_SD;
 
     i2s_driver_uninstall(I2S_PORT);

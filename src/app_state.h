@@ -4,7 +4,6 @@
 #include "app_config.h"
 
 struct AppState {
-    bool recordMode = false;
     int16_t rawData[MIC_DMA_LEN] = {};
     int rawLen = 0;
     String lastUid = "(no card)";
