@@ -17,6 +17,28 @@ void taskNetwork() {
     wifiEnsureConnected();
 }
 
+bool taskStartup() {
+    unsigned long now = millis();
+    unsigned long elapsed = now - app.startupSplashStartedMs;
+
+    if (!app.wifiReadyBeeped && elapsed >= STARTUP_SPLASH_MS && wifiIsReady()) {
+        audioBeep(WIFI_CONNECTED_BEEP_FREQ, WIFI_CONNECTED_BEEP_MS);
+        app.wifiReadyBeeped = true;
+    }
+
+    if (elapsed >= STARTUP_SPLASH_MS) {
+        return false;
+    }
+
+    if (app.lastStartupFrameMs == 0 ||
+        now - app.lastStartupFrameMs >= STARTUP_SPINNER_INTERVAL_MS) {
+        oledDrawStartup(elapsed);
+        app.lastStartupFrameMs = now;
+    }
+
+    return true;
+}
+
 void taskAudioCapture() {
     app.rawLen = 0;
     audioReadMic(app.rawData, app.rawLen);
@@ -51,8 +73,11 @@ void taskDemoUiAndRfid() {
 
 void setup() {
     serialTelemetryBegin();
-    audioPrepareOutput();
     oledInit();
+    app.startupSplashStartedMs = millis();
+    oledDrawStartup(0);
+
+    audioPrepareOutput();
     rfidInit();
 
     audioInit();
@@ -62,12 +87,14 @@ void setup() {
     wsBegin();
 
     audioEnableOutput();
-    delay(50);
-    audioBeep(900, 80);
 }
 
 void loop() {
     taskNetwork();
+    if (taskStartup()) {
+        return;
+    }
+
     taskAudioCapture();
     taskAudioStream();
     taskWakeword();

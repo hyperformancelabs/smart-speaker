@@ -48,6 +48,7 @@
 
 namespace {
 unsigned long lastWifiRetryMs = 0;
+unsigned long wifiAttemptStartedMs = 0;
 bool accessPointStarted = false;
 
 bool wifiStartAccessPoint() {
@@ -71,14 +72,12 @@ void wifiConnect() {
 #if APP_WIFI_MODE == APP_WIFI_MODE_AP
     WiFi.mode(WIFI_AP);
     accessPointStarted = wifiStartAccessPoint();
+    lastWifiRetryMs = millis();
 #else
     WiFi.mode(WIFI_STA);
     WiFi.begin(WIFI_STA_SSID, WIFI_STA_PASSWORD);
-
-    unsigned long t0 = millis();
-    while (WiFi.status() != WL_CONNECTED && (millis() - t0) < WIFI_TIMEOUT_MS) {
-        delay(250);
-    }
+    wifiAttemptStartedMs = millis();
+    lastWifiRetryMs = wifiAttemptStartedMs;
 #endif
 }
 
@@ -92,12 +91,20 @@ void wifiEnsureConnected() {
     lastWifiRetryMs = now;
     accessPointStarted = wifiStartAccessPoint();
 #else
-    if (WiFi.status() == WL_CONNECTED) return;
-
     unsigned long now = millis();
+    wl_status_t status = WiFi.status();
+
+    if (status == WL_CONNECTED) return;
+
+    const bool failedImmediately = status == WL_CONNECT_FAILED || status == WL_NO_SSID_AVAIL;
+    const bool attemptExpired =
+        wifiAttemptStartedMs > 0 && (now - wifiAttemptStartedMs) >= WIFI_TIMEOUT_MS;
+
+    if (!failedImmediately && !attemptExpired) return;
     if (now - lastWifiRetryMs < WIFI_RETRY_MS) return;
 
     lastWifiRetryMs = now;
+    wifiAttemptStartedMs = now;
     WiFi.disconnect();
     WiFi.begin(WIFI_STA_SSID, WIFI_STA_PASSWORD);
 #endif

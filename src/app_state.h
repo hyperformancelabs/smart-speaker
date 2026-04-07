@@ -19,6 +19,9 @@ struct AppState {
     int rawLen = 0;
     String lastUid = "(no card)";
     WakewordInfo wakeword = {};
+    unsigned long startupSplashStartedMs = 0;
+    unsigned long lastStartupFrameMs = 0;
     unsigned long lastDemoTick = 0;
+    bool wifiReadyBeeped = false;
     int pendingCardEvent = 0;
 };
