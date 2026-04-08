@@ -53,4 +53,4 @@ constexpr int SERIAL_RAW_LINES = 32;
 
 constexpr uint16_t WS_PORT = 81;
 constexpr unsigned long WIFI_TIMEOUT_MS = 15000;
-constexpr unsigned long WIFI_RETRY_MS = 5000;
+constexpr unsigned long WIFI_RETRY_MS = 1000;

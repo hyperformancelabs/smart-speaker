@@ -1,6 +1,7 @@
 #include "net/wifi_service.h"
 
 #include <cstring>
+#include <Arduino.h>
 #include <WiFi.h>
 
 #include "app_config.h"
@@ -66,6 +67,13 @@ bool wifiStartAccessPoint() {
 
     return WiFi.softAP(WIFI_AP_SSID, WIFI_AP_PASSWORD);
 }
+
+void wifiRestartStationConnection(unsigned long now) {
+    lastWifiRetryMs = now;
+    wifiAttemptStartedMs = now;
+    WiFi.disconnect();
+    WiFi.begin(WIFI_STA_SSID, WIFI_STA_PASSWORD);
+}
 }
 
 void wifiConnect() {
@@ -118,11 +126,34 @@ void wifiEnsureConnected() {
     if (wifiGetConnectionState() != WifiConnectionState::Failed) return;
     if (now - lastWifiRetryMs < WIFI_RETRY_MS) return;
 
-    lastWifiRetryMs = now;
-    wifiAttemptStartedMs = now;
-    WiFi.disconnect();
-    WiFi.begin(WIFI_STA_SSID, WIFI_STA_PASSWORD);
+    wifiRestartStationConnection(now);
 #endif
+}
+
+void wifiForceReconnect() {
+#if APP_WIFI_MODE == APP_WIFI_MODE_AP
+    accessPointStarted = false;
+    lastWifiRetryMs = millis();
+    accessPointStarted = wifiStartAccessPoint();
+#else
+    wifiRestartStationConnection(millis());
+#endif
+}
+
+bool wifiWaitUntilReady(unsigned long timeoutMs) {
+    const unsigned long startedMs = millis();
+
+    while (!wifiIsReady()) {
+        wifiEnsureConnected();
+
+        if (timeoutMs == 0 || millis() - startedMs >= timeoutMs) {
+            break;
+        }
+
+        delay(50);
+    }
+
+    return wifiIsReady();
 }
 
 bool wifiIsReady() {

@@ -11,3 +11,9 @@ Thumbs.db
 # local config files
 include/secrets.h
 .local
+
+*.env
+
+*__pycache__/
+*.pyc
+*.venv/

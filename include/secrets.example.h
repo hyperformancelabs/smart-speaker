@@ -14,4 +14,7 @@
 #define WIFI_AP_SSID      "ESP32-Audio"
 #define WIFI_AP_PASSWORD  "12345678"
 
+// Shared base URL for both the device API calls and the registration page.
+#define SERVER_URL "your.server.url"
+
 #endif
