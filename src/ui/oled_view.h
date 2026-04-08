@@ -6,4 +6,5 @@
 
 void oledInit();
 void oledDrawStartup(unsigned long elapsedMs);
+void oledDrawStartupConnectionError();
 void oledDraw(const int16_t rawData[], int rawLen, const WakewordInfo &wakeword, const String &uid);

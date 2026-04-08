@@ -45,10 +45,6 @@ void oledDrawStartup(unsigned long elapsedMs) {
     const char *title = "SS Project";
     const int spinnerSize = 18;
     const int gap = 8;
-    const int barWidth = 78;
-    const int barHeight = 6;
-    const int barX = (SCREEN_WIDTH - barWidth) / 2;
-    const int barY = 42;
 
     int16_t textX1 = 0;
     int16_t textY1 = 0;
@@ -62,21 +58,39 @@ void oledDrawStartup(unsigned long elapsedMs) {
     const int groupWidth = spinnerSize + gap + textWidth;
     const int groupLeft = (SCREEN_WIDTH - groupWidth) / 2;
     const int spinnerCenterX = groupLeft + spinnerSize / 2;
-    const int spinnerCenterY = 25;
+    const int spinnerCenterY = SCREEN_HEIGHT / 2;
     const int titleX = groupLeft + spinnerSize + gap;
     const int titleY = spinnerCenterY - (textHeight / 2);
     const uint8_t activeDot = (elapsedMs / STARTUP_SPINNER_INTERVAL_MS) % kSpinnerDotCount;
-    const int innerBarWidth = barWidth - 2;
-    const int fillWidth = min(innerBarWidth, (int)((elapsedMs * innerBarWidth) / STARTUP_SPLASH_MS));
 
     drawStartupSpinner(spinnerCenterX, spinnerCenterY, activeDot);
 
     display.setCursor(titleX, titleY);
     display.print(title);
 
-    display.drawRect(barX, barY, barWidth, barHeight, SSD1306_WHITE);
-    if (fillWidth > 0) {
-        display.fillRect(barX + 1, barY + 1, fillWidth, barHeight - 2, SSD1306_WHITE);
+    display.display();
+}
+
+void oledDrawStartupConnectionError() {
+    const char *line1 = "No internet";
+    const char *line2 = "connection.";
+    const char *line3 = "Please check Wi-Fi.";
+    const char *lines[] = {line1, line2, line3};
+
+    display.clearDisplay();
+    display.setTextSize(1);
+
+    for (uint8_t i = 0; i < 3; i++) {
+        int16_t textX1 = 0;
+        int16_t textY1 = 0;
+        uint16_t textWidth = 0;
+        uint16_t textHeight = 0;
+        display.getTextBounds(lines[i], 0, 0, &textX1, &textY1, &textWidth, &textHeight);
+        int x = (SCREEN_WIDTH - textWidth) / 2;
+        int y = 18 + (i * 12);
+
+        display.setCursor(x, y);
+        display.print(lines[i]);
     }
 
     display.display();

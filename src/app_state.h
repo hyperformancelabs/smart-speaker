@@ -23,5 +23,6 @@ struct AppState {
     unsigned long lastStartupFrameMs = 0;
     unsigned long lastDemoTick = 0;
     bool wifiReadyBeeped = false;
+    bool startupShowingError = false;
     int pendingCardEvent = 0;
 };

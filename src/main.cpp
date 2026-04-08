@@ -20,20 +20,35 @@ void taskNetwork() {
 bool taskStartup() {
     unsigned long now = millis();
     unsigned long elapsed = now - app.startupSplashStartedMs;
+    WifiConnectionState wifiState = wifiGetConnectionState();
 
-    if (!app.wifiReadyBeeped && elapsed >= STARTUP_SPLASH_MS && wifiIsReady()) {
+    if (!app.wifiReadyBeeped && elapsed >= STARTUP_SPLASH_MS &&
+        wifiState == WifiConnectionState::Ready) {
         audioBeep(WIFI_CONNECTED_BEEP_FREQ, WIFI_CONNECTED_BEEP_MS);
         app.wifiReadyBeeped = true;
     }
 
-    if (elapsed >= STARTUP_SPLASH_MS) {
+    if (elapsed >= STARTUP_SPLASH_MS && wifiState == WifiConnectionState::Ready) {
         return false;
     }
 
-    if (app.lastStartupFrameMs == 0 ||
-        now - app.lastStartupFrameMs >= STARTUP_SPINNER_INTERVAL_MS) {
-        oledDrawStartup(elapsed);
-        app.lastStartupFrameMs = now;
+    const bool shouldShowLoading =
+        elapsed < STARTUP_SPLASH_MS || wifiState == WifiConnectionState::Connecting;
+
+    if (shouldShowLoading) {
+        if (app.startupShowingError || app.lastStartupFrameMs == 0 ||
+            now - app.lastStartupFrameMs >= STARTUP_SPINNER_INTERVAL_MS) {
+            oledDrawStartup(elapsed);
+            app.lastStartupFrameMs = now;
+            app.startupShowingError = false;
+        }
+
+        return true;
+    }
+
+    if (!app.startupShowingError) {
+        oledDrawStartupConnectionError();
+        app.startupShowingError = true;
     }
 
     return true;

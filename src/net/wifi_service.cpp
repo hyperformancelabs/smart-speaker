@@ -81,6 +81,29 @@ void wifiConnect() {
 #endif
 }
 
+WifiConnectionState wifiGetConnectionState() {
+#if APP_WIFI_MODE == APP_WIFI_MODE_AP
+    return accessPointStarted ? WifiConnectionState::Ready : WifiConnectionState::Failed;
+#else
+    wl_status_t status = WiFi.status();
+
+    if (status == WL_CONNECTED) {
+        return WifiConnectionState::Ready;
+    }
+
+    const bool failedImmediately =
+        status == WL_CONNECT_FAILED || status == WL_NO_SSID_AVAIL || status == WL_CONNECTION_LOST;
+    const bool attemptExpired =
+        wifiAttemptStartedMs > 0 && (millis() - wifiAttemptStartedMs) >= WIFI_TIMEOUT_MS;
+
+    if (failedImmediately || attemptExpired) {
+        return WifiConnectionState::Failed;
+    }
+
+    return WifiConnectionState::Connecting;
+#endif
+}
+
 void wifiEnsureConnected() {
 #if APP_WIFI_MODE == APP_WIFI_MODE_AP
     if (accessPointStarted) return;
@@ -92,15 +115,7 @@ void wifiEnsureConnected() {
     accessPointStarted = wifiStartAccessPoint();
 #else
     unsigned long now = millis();
-    wl_status_t status = WiFi.status();
-
-    if (status == WL_CONNECTED) return;
-
-    const bool failedImmediately = status == WL_CONNECT_FAILED || status == WL_NO_SSID_AVAIL;
-    const bool attemptExpired =
-        wifiAttemptStartedMs > 0 && (now - wifiAttemptStartedMs) >= WIFI_TIMEOUT_MS;
-
-    if (!failedImmediately && !attemptExpired) return;
+    if (wifiGetConnectionState() != WifiConnectionState::Failed) return;
     if (now - lastWifiRetryMs < WIFI_RETRY_MS) return;
 
     lastWifiRetryMs = now;
@@ -111,11 +126,7 @@ void wifiEnsureConnected() {
 }
 
 bool wifiIsReady() {
-#if APP_WIFI_MODE == APP_WIFI_MODE_AP
-    return accessPointStarted;
-#else
-    return WiFi.status() == WL_CONNECTED;
-#endif
+    return wifiGetConnectionState() == WifiConnectionState::Ready;
 }
 
 IPAddress wifiGetIpAddress() {
