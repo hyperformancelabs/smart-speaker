@@ -3,4 +3,4 @@
 #include <Arduino.h>
 
 void rfidInit();
-void rfidPoll(String &lastUid, int &pendingCardEvent);
+bool rfidPoll(char uidOut[], size_t uidOutSize);

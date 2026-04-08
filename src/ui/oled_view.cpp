@@ -96,7 +96,7 @@ void oledDrawStartupConnectionError() {
     display.display();
 }
 
-void oledDraw(const int16_t rawData[], int rawLen, const WakewordInfo &wakeword, const String &uid) {
+void oledDraw(const int16_t rawData[], int rawLen, const WakewordInfo &wakeword, const char *uid) {
     const int waveLeft = 0;
     const int waveRight = SCREEN_WIDTH - 1;
     const int waveTop = 20;
@@ -144,7 +144,7 @@ void oledDraw(const int16_t rawData[], int rawLen, const WakewordInfo &wakeword,
 
     display.setCursor(0, 54);
     display.print("UID:");
-    display.println(uid);
+    display.println(uid != nullptr ? uid : "");
 
     display.display();
 }

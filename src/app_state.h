@@ -14,15 +14,14 @@ struct WakewordInfo {
     unsigned long lastDetectionMs = 0;
 };
 
+struct AudioChunk {
+    int16_t samples[MIC_DMA_LEN] = {};
+    uint16_t len = 0;
+    unsigned long capturedMs = 0;
+};
+
 struct AppState {
-    int16_t rawData[MIC_DMA_LEN] = {};
-    int rawLen = 0;
-    String lastUid = "(no card)";
+    AudioChunk latestAudio = {};
+    char lastUid[32] = "(no card)";
     WakewordInfo wakeword = {};
-    unsigned long startupSplashStartedMs = 0;
-    unsigned long lastStartupFrameMs = 0;
-    unsigned long lastDemoTick = 0;
-    bool wifiReadyBeeped = false;
-    bool startupShowingError = false;
-    int pendingCardEvent = 0;
 };
