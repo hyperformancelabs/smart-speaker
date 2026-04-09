@@ -6,6 +6,11 @@
 #include "app_config.h"
 #include "net/ws_service.h"
 
+namespace {
+int16_t gWsFrame[FRAME_SAMPLES] = {};
+int gWsFill = 0;
+}
+
 void audioPrepareOutput() {
     pinMode(PIN_AMP_SD, OUTPUT);
     digitalWrite(PIN_AMP_SD, LOW);
@@ -92,15 +97,16 @@ void audioReadMic(int16_t rawOut[], int &rawLen) {
     }
 }
 
-void audioFeedWsFrames(const int16_t rawData[], int rawLen) {
-    static int16_t frame[FRAME_SAMPLES];
-    static int fill = 0;
+void audioResetWsFrames() {
+    gWsFill = 0;
+}
 
+void audioFeedWsFrames(const int16_t rawData[], int rawLen) {
     for (int i = 0; i < rawLen; i++) {
-        frame[fill++] = rawData[i];
-        if (fill == FRAME_SAMPLES) {
-            wsSendAudioFrame(frame, FRAME_SAMPLES);
-            fill = 0;
+        gWsFrame[gWsFill++] = rawData[i];
+        if (gWsFill == FRAME_SAMPLES) {
+            wsSendAudioFrame(gWsFrame, FRAME_SAMPLES);
+            gWsFill = 0;
         }
     }
 }

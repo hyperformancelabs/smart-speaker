@@ -54,7 +54,14 @@ enum class UiMode {
     LookupError,
     RegisterPrompt,
     Greeting,
-    Main,
+    WaitWakeword,
+    Streaming,
+};
+
+enum class AudioSessionMode {
+    Idle,
+    WaitWakeword,
+    Streaming,
 };
 
 struct BeepRequest {
@@ -80,7 +87,10 @@ QueueHandle_t gBeepQueue = nullptr;
 QueueHandle_t gProfileLookupRequestQueue = nullptr;
 QueueHandle_t gProfileLookupResultQueue = nullptr;
 bool gTasksStarted = false;
-volatile bool gMainFeaturesActive = false;
+volatile AudioSessionMode gAudioSessionMode = AudioSessionMode::Idle;
+volatile bool gWakewordTransitionPending = false;
+
+void resetRealtimeAppState();
 
 void copyText(char dest[], size_t destSize, const char *src) {
     if (destSize == 0) {
@@ -209,8 +219,76 @@ bool pollProfileLookupResult(ProfileLookupResult &result) {
     return xQueueReceive(gProfileLookupResultQueue, &result, 0) == pdPASS;
 }
 
-bool areMainFeaturesActive() {
-    return gMainFeaturesActive;
+AudioSessionMode audioSessionModeForUi(UiMode uiMode) {
+    switch (uiMode) {
+        case UiMode::WaitWakeword:
+            return AudioSessionMode::WaitWakeword;
+        case UiMode::Streaming:
+            return AudioSessionMode::Streaming;
+        case UiMode::Splash:
+        case UiMode::WifiReconnect:
+        case UiMode::AwaitNfc:
+        case UiMode::Loading:
+        case UiMode::LookupError:
+        case UiMode::RegisterPrompt:
+        case UiMode::Greeting:
+            return AudioSessionMode::Idle;
+    }
+
+    return AudioSessionMode::Idle;
+}
+
+void clearWakewordTransition() {
+    gWakewordTransitionPending = false;
+}
+
+void signalWakewordTransition() {
+    gWakewordTransitionPending = true;
+}
+
+bool consumeWakewordTransition() {
+    if (!gWakewordTransitionPending) {
+        return false;
+    }
+
+    gWakewordTransitionPending = false;
+    return true;
+}
+
+void setAudioSessionMode(AudioSessionMode nextMode) {
+    if (gAudioSessionMode == nextMode) {
+        return;
+    }
+
+    const bool leavingStreaming =
+        gAudioSessionMode == AudioSessionMode::Streaming &&
+        nextMode != AudioSessionMode::Streaming;
+
+    gAudioSessionMode = nextMode;
+
+    if (nextMode != AudioSessionMode::WaitWakeword) {
+        clearWakewordTransition();
+    }
+
+    if (nextMode == AudioSessionMode::Idle) {
+        resetRealtimeAppState();
+    }
+
+    if (leavingStreaming) {
+        audioResetWsFrames();
+    }
+}
+
+bool isAudioSessionActive() {
+    return gAudioSessionMode != AudioSessionMode::Idle;
+}
+
+bool isWakewordDetectionActive() {
+    return gAudioSessionMode == AudioSessionMode::WaitWakeword;
+}
+
+bool isStreamingActive() {
+    return gAudioSessionMode == AudioSessionMode::Streaming;
 }
 
 void resetRealtimeAppState() {
@@ -236,7 +314,8 @@ bool shouldPollRfid(UiMode uiMode, bool profileLookupPending) {
         case UiMode::AwaitNfc:
         case UiMode::LookupError:
         case UiMode::RegisterPrompt:
-        case UiMode::Main:
+        case UiMode::WaitWakeword:
+        case UiMode::Streaming:
             return true;
         case UiMode::Splash:
         case UiMode::WifiReconnect:
@@ -257,7 +336,8 @@ bool shouldShowWifiReconnect(UiMode uiMode, bool profileLookupPending, WifiConne
         case UiMode::AwaitNfc:
         case UiMode::LookupError:
         case UiMode::RegisterPrompt:
-        case UiMode::Main:
+        case UiMode::WaitWakeword:
+        case UiMode::Streaming:
         case UiMode::WifiReconnect:
             return true;
         case UiMode::Splash:
@@ -275,12 +355,8 @@ void setUiMode(UiMode &uiMode, UiMode nextMode, unsigned long &lastUiFrameMs) {
     }
 
     uiMode = nextMode;
-    gMainFeaturesActive = (nextMode == UiMode::Main);
+    setAudioSessionMode(audioSessionModeForUi(nextMode));
     lastUiFrameMs = 0;
-
-    if (!gMainFeaturesActive) {
-        resetRealtimeAppState();
-    }
 }
 
 bool handleStartupUi(unsigned long splashStartedMs,
@@ -329,7 +405,7 @@ void audioCaptureTask(void *param) {
     AudioChunk chunk = {};
 
     for (;;) {
-        if (!areMainFeaturesActive()) {
+        if (!isAudioSessionActive()) {
             vTaskDelay(pdMS_TO_TICKS(kUiSleepMs));
             continue;
         }
@@ -345,8 +421,12 @@ void audioCaptureTask(void *param) {
         chunk.capturedMs = millis();
 
         storeLatestAudio(chunk);
-        pushLatestAudio(gWakewordQueue, chunk);
-        pushLatestAudio(gStreamQueue, chunk);
+        if (isWakewordDetectionActive()) {
+            pushLatestAudio(gWakewordQueue, chunk);
+        }
+        if (isStreamingActive()) {
+            pushLatestAudio(gStreamQueue, chunk);
+        }
     }
 }
 
@@ -358,7 +438,7 @@ void wakewordTask(void *param) {
     bool wakewordActive = false;
 
     for (;;) {
-        if (!areMainFeaturesActive()) {
+        if (!isWakewordDetectionActive()) {
             if (wakewordActive) {
                 wakewordActive = false;
                 wakeword = {};
@@ -384,6 +464,7 @@ void wakewordTask(void *param) {
 
         if (wakewordProcessSamples(chunk.samples, chunk.len, wakeword)) {
             queueBeep(WAKEWORD_BEEP_FREQ, WAKEWORD_BEEP_MS);
+            signalWakewordTransition();
         }
 
         storeWakewordState(wakeword);
@@ -398,21 +479,25 @@ void networkTask(void *param) {
 
     for (;;) {
         wifiEnsureConnected();
+        wsLoop();
 
-        if (!areMainFeaturesActive()) {
+        if (!isStreamingActive()) {
             if (streamingActive) {
                 streamingActive = false;
                 if (gStreamQueue != nullptr) {
                     xQueueReset(gStreamQueue);
                 }
+                audioResetWsFrames();
             }
 
             vTaskDelay(pdMS_TO_TICKS(kNetworkSleepMs));
             continue;
         }
 
-        streamingActive = true;
-        wsLoop();
+        if (!streamingActive) {
+            streamingActive = true;
+            audioResetWsFrames();
+        }
 
         bool drainedAnyChunk = false;
         while (xQueueReceive(gStreamQueue, &chunk, 0) == pdPASS) {
@@ -497,7 +582,7 @@ void uiTask(void *param) {
     bool profileLookupPending = false;
     UiMode reconnectResumeMode = UiMode::AwaitNfc;
 
-    gMainFeaturesActive = false;
+    setAudioSessionMode(AudioSessionMode::Idle);
 
     for (;;) {
         if (!startupCompleted) {
@@ -576,7 +661,11 @@ void uiTask(void *param) {
         if (uiMode == UiMode::Greeting &&
             greetingStartedMs > 0 &&
             now - greetingStartedMs >= kGreetingDurationMs) {
-            setUiMode(uiMode, UiMode::Main, lastUiFrameMs);
+            setUiMode(uiMode, UiMode::WaitWakeword, lastUiFrameMs);
+        }
+
+        if (uiMode == UiMode::WaitWakeword && consumeWakewordTransition()) {
+            setUiMode(uiMode, UiMode::Streaming, lastUiFrameMs);
         }
 
         if (lastUiFrameMs == 0 || now - lastUiFrameMs >= kUiIntervalMs) {
@@ -601,9 +690,11 @@ void uiTask(void *param) {
                 case UiMode::Greeting:
                     oledDrawGreeting(greetingName);
                     break;
-                case UiMode::Main:
-                    oledDraw(snapshot.latestAudio.samples, snapshot.latestAudio.len,
-                             snapshot.wakeword, snapshot.lastUid);
+                case UiMode::WaitWakeword:
+                    oledDrawWakewordSleep();
+                    break;
+                case UiMode::Streaming:
+                    oledDrawStreamingFace(snapshot.latestAudio.samples, snapshot.latestAudio.len);
                     serialSendPlotter(snapshot.latestAudio.samples, snapshot.latestAudio.len, 0);
                     break;
                 case UiMode::Splash:

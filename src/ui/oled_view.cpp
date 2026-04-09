@@ -6,7 +6,6 @@
 #include <qrcode.h>
 
 #include "app_config.h"
-#include "net/wifi_service.h"
 
 namespace {
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
@@ -34,6 +33,22 @@ struct QrRenderLayout {
 
 QrRenderArea gQrRenderArea = {};
 QrRenderLayout gQrRenderLayout = {};
+constexpr int kRobotHeadX = 14;
+constexpr int kRobotHeadY = 14;
+constexpr int kRobotHeadWidth = 100;
+constexpr int kRobotHeadHeight = 44;
+constexpr int kRobotAntennaX = SCREEN_WIDTH / 2;
+constexpr int kLeftEyeCenterX = 40;
+constexpr int kRightEyeCenterX = 88;
+constexpr int kEyeCenterY = 29;
+constexpr int kMouthBoxX = 32;
+constexpr int kMouthBoxY = 39;
+constexpr int kMouthBoxWidth = 64;
+constexpr int kMouthBoxHeight = 13;
+constexpr int kSleepMouthX = 42;
+constexpr int kSleepMouthY = 41;
+constexpr int kSleepMouthWidth = 44;
+constexpr int kSleepMouthHeight = 9;
 
 void drawCenteredLines(const char *const lines[], uint8_t lineCount, int startY, int lineGap) {
     display.clearDisplay();
@@ -159,6 +174,146 @@ QrRenderLayout drawQrCodeAt(const char *text, int originX, int originY, int avai
 
     esp_qrcode_generate(&cfg, text);
     return gQrRenderLayout;
+}
+
+void drawRobotHeadFrame() {
+    display.fillRoundRect(kRobotHeadX - 4, kRobotHeadY + 13, 5, 12, 2, SSD1306_WHITE);
+    display.fillRoundRect(
+        kRobotHeadX + kRobotHeadWidth - 1, kRobotHeadY + 13, 5, 12, 2, SSD1306_WHITE);
+    display.drawRoundRect(
+        kRobotHeadX, kRobotHeadY, kRobotHeadWidth, kRobotHeadHeight, 11, SSD1306_WHITE);
+    display.drawRoundRect(
+        kRobotHeadX + 3, kRobotHeadY + 3, kRobotHeadWidth - 6, kRobotHeadHeight - 6, 8, SSD1306_WHITE);
+    display.drawLine(kRobotAntennaX, 8, kRobotAntennaX, kRobotHeadY, SSD1306_WHITE);
+    display.fillCircle(kRobotAntennaX, 5, 2, SSD1306_WHITE);
+    display.drawPixel(kRobotHeadX + 20, kRobotHeadY + kRobotHeadHeight - 7, SSD1306_WHITE);
+    display.drawPixel(kRobotHeadX + 79, kRobotHeadY + kRobotHeadHeight - 7, SSD1306_WHITE);
+}
+
+void drawClosedEye(int centerX, int centerY) {
+    display.drawLine(centerX - 11, centerY + 1, centerX + 11, centerY + 1, SSD1306_WHITE);
+    display.drawLine(centerX - 9, centerY, centerX + 9, centerY, SSD1306_WHITE);
+    display.drawPixel(centerX - 7, centerY - 1, SSD1306_WHITE);
+    display.drawPixel(centerX + 7, centerY - 1, SSD1306_WHITE);
+    display.drawPixel(centerX - 4, centerY + 2, SSD1306_WHITE);
+    display.drawPixel(centerX + 4, centerY + 2, SSD1306_WHITE);
+}
+
+void drawOpenEye(int centerX, int centerY) {
+    display.fillRoundRect(centerX - 12, centerY - 7, 24, 14, 6, SSD1306_WHITE);
+    display.drawRoundRect(centerX - 11, centerY - 6, 22, 12, 5, SSD1306_BLACK);
+    display.fillCircle(centerX, centerY, 3, SSD1306_BLACK);
+    display.drawPixel(centerX - 1, centerY - 1, SSD1306_WHITE);
+    display.drawPixel(centerX, centerY - 2, SSD1306_WHITE);
+}
+
+void drawCheek(int centerX, int centerY) {
+    display.drawCircle(centerX, centerY, 2, SSD1306_WHITE);
+    display.drawPixel(centerX - 4, centerY, SSD1306_WHITE);
+    display.drawPixel(centerX + 4, centerY, SSD1306_WHITE);
+}
+
+void drawSleepDecoration() {
+    display.drawCircle(87, 13, 1, SSD1306_WHITE);
+    display.setCursor(92, 0);
+    display.print("z");
+    display.setCursor(100, 3);
+    display.print("z");
+    display.setCursor(108, 6);
+    display.print("Z");
+}
+
+void drawSleepMouth() {
+    display.fillRoundRect(
+        kSleepMouthX, kSleepMouthY, kSleepMouthWidth, kSleepMouthHeight, 4, SSD1306_WHITE);
+    display.drawRoundRect(
+        kSleepMouthX + 1, kSleepMouthY + 1, kSleepMouthWidth - 2, kSleepMouthHeight - 2, 4, SSD1306_BLACK);
+    display.drawLine(
+        kSleepMouthX + 8,
+        kSleepMouthY + (kSleepMouthHeight / 2) + 1,
+        kSleepMouthX + kSleepMouthWidth - 9,
+        kSleepMouthY + (kSleepMouthHeight / 2) + 1,
+        SSD1306_BLACK);
+    display.drawPixel(kSleepMouthX + 6, kSleepMouthY + (kSleepMouthHeight / 2), SSD1306_BLACK);
+    display.drawPixel(
+        kSleepMouthX + kSleepMouthWidth - 7,
+        kSleepMouthY + (kSleepMouthHeight / 2),
+        SSD1306_BLACK);
+}
+
+void drawWaveformInRect(const int16_t rawData[],
+                        int rawLen,
+                        int x,
+                        int y,
+                        int width,
+                        int height) {
+    if (width < 4 || height < 4) {
+        return;
+    }
+
+    display.drawRoundRect(x, y, width, height, 4, SSD1306_WHITE);
+    const int innerLeft = x + 1;
+    const int innerTop = y + 1;
+    const int innerWidth = width - 2;
+    const int innerHeight = height - 2;
+    const int midY = innerTop + innerHeight / 2;
+    const int halfSpan = innerHeight / 2;
+
+    display.drawPixel(x + 6, midY, SSD1306_WHITE);
+    display.drawPixel(x + width - 7, midY, SSD1306_WHITE);
+
+    if (rawLen <= 1) {
+        display.drawFastHLine(x + 10, midY, width - 20, SSD1306_WHITE);
+        return;
+    }
+
+    int peakAbs = 0;
+    for (int i = 0; i < rawLen; ++i) {
+        int sampleAbs = rawData[i];
+        if (sampleAbs < 0) {
+            sampleAbs = -sampleAbs;
+        }
+        if (sampleAbs > peakAbs) {
+            peakAbs = sampleAbs;
+        }
+    }
+
+    // Auto-scale the current chunk so spoken audio stays visible on the small OLED,
+    // while keeping enough headroom to avoid the waveform becoming a solid block.
+    int displayPeak = peakAbs;
+    if (displayPeak < 1800) {
+        displayPeak = 1800;
+    } else if (displayPeak > 12000) {
+        displayPeak = 12000;
+    }
+
+    int prevX = innerLeft;
+    int prevOffset = (static_cast<long>(rawData[0]) * halfSpan) / displayPeak;
+    if (prevOffset > halfSpan) {
+        prevOffset = halfSpan;
+    } else if (prevOffset < -halfSpan) {
+        prevOffset = -halfSpan;
+    }
+    int prevY = midY - prevOffset;
+
+    for (int i = 1; i < innerWidth; ++i) {
+        int idx = (i * rawLen) / innerWidth;
+        if (idx >= rawLen) {
+            idx = rawLen - 1;
+        }
+
+        const int currentX = innerLeft + i;
+        int currentOffset = (static_cast<long>(rawData[idx]) * halfSpan) / displayPeak;
+        if (currentOffset > halfSpan) {
+            currentOffset = halfSpan;
+        } else if (currentOffset < -halfSpan) {
+            currentOffset = -halfSpan;
+        }
+        const int currentY = midY - currentOffset;
+        display.drawLine(prevX, prevY, currentX, currentY, SSD1306_WHITE);
+        prevX = currentX;
+        prevY = currentY;
+    }
 }
 }
 
@@ -320,55 +475,32 @@ void oledDrawGreeting(const char *name) {
     display.display();
 }
 
-void oledDraw(const int16_t rawData[], int rawLen, const WakewordInfo &wakeword, const char *uid) {
-    const int waveLeft = 0;
-    const int waveRight = SCREEN_WIDTH - 1;
-    const int waveTop = 20;
-    const int waveBottom = 47;
-    const bool recentWakeword =
-        wakeword.lastDetectionMs > 0 &&
-        millis() - wakeword.lastDetectionMs < WAKEWORD_DETECTION_COOLDOWN_MS;
-
+void oledDrawWakewordSleep() {
     display.clearDisplay();
-    display.setCursor(0, 0);
-    if (wifiIsReady()) {
-        display.print("WS:");
-        display.println(wifiGetIpAddress());
-    } else {
-        display.println("WS: CONNECTING...");
-    }
+    display.setFont();
+    display.setTextSize(1);
 
-    display.setCursor(0, 10);
-    display.print("WW:");
-    if (!wakeword.hasInference) {
-        display.println("warming...");
-    } else if (recentWakeword) {
-        display.print("WAKEUP ");
-        display.println(wakeword.wakeupScore, 2);
-    } else {
-        display.print(wakeword.topLabel);
-        display.print(" ");
-        display.println(wakeword.topScore, 2);
-    }
+    drawRobotHeadFrame();
+    drawClosedEye(kLeftEyeCenterX, kEyeCenterY);
+    drawClosedEye(kRightEyeCenterX, kEyeCenterY);
+    drawCheek(27, 42);
+    drawCheek(101, 42);
+    drawSleepMouth();
+    drawSleepDecoration();
+    display.display();
+}
 
-    display.drawRect(waveLeft, waveTop, SCREEN_WIDTH, waveBottom - waveTop + 1, SSD1306_WHITE);
-    int mid = (waveTop + waveBottom) / 2;
-    display.drawFastHLine(waveLeft + 1, mid, SCREEN_WIDTH - 2, SSD1306_WHITE);
+void oledDrawStreamingFace(const int16_t rawData[], int rawLen) {
+    display.clearDisplay();
+    display.setFont();
+    display.setTextSize(1);
 
-    if (rawLen > 1) {
-        int prevY = map((long)rawData[0], -32768, 32767, waveBottom - 1, waveTop + 1);
-        for (int x = 1; x <= waveRight - 1; x++) {
-            int idx = ((x - 1) * rawLen) / (SCREEN_WIDTH - 2);
-            if (idx >= rawLen) idx = rawLen - 1;
-            int y = map((long)rawData[idx], -32768, 32767, waveBottom - 1, waveTop + 1);
-            display.drawLine(x, prevY, x + 1, y, SSD1306_WHITE);
-            prevY = y;
-        }
-    }
-
-    display.setCursor(0, 54);
-    display.print("UID:");
-    display.println(uid != nullptr ? uid : "");
+    drawRobotHeadFrame();
+    drawOpenEye(kLeftEyeCenterX, kEyeCenterY);
+    drawOpenEye(kRightEyeCenterX, kEyeCenterY);
+    drawCheek(27, 42);
+    drawCheek(101, 42);
+    drawWaveformInRect(rawData, rawLen, kMouthBoxX, kMouthBoxY, kMouthBoxWidth, kMouthBoxHeight);
 
     display.display();
 }

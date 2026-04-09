@@ -13,4 +13,5 @@ void oledDrawLoading(unsigned long elapsedMs);
 void oledDrawLookupError();
 void oledDrawRegistrationPrompt(const char *registerUrl);
 void oledDrawGreeting(const char *name);
-void oledDraw(const int16_t rawData[], int rawLen, const WakewordInfo &wakeword, const char *uid);
+void oledDrawWakewordSleep();
+void oledDrawStreamingFace(const int16_t rawData[], int rawLen);

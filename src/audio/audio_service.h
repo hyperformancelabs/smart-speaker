@@ -7,4 +7,5 @@ void audioEnableOutput();
 void audioInit();
 void audioBeep(int freq = 1200, int ms = 80);
 void audioReadMic(int16_t rawOut[], int &rawLen);
+void audioResetWsFrames();
 void audioFeedWsFrames(const int16_t rawData[], int rawLen);
