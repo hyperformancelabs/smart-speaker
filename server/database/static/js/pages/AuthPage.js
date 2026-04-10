@@ -1,6 +1,5 @@
 import { showToast } from "../services/utils.js";
 import { loadDashboard } from "./DashboardPage.js";
-import { AuthAPI } from "../services/api.js";
 
 export function renderLogin() {
   const app = document.getElementById("app");
@@ -25,13 +24,16 @@ export function renderLogin() {
 
                 <form id="login-form" class="modern-form">
                     <div class="form-group">
-                        <label><i class="fa-regular fa-envelope"></i> Email</label>
-                        <input type="email" id="email" placeholder="Nhập địa chỉ email" required>
+                        <label><i class="fa-regular fa-user"></i> Tên đăng nhập</label>
+                        <input type="text" id="username" placeholder="Nhập username">
+                        <small id="username-error" class="text-danger" style="display: none; font-size: 0.85rem; margin-top: 4px;"></small>
                     </div>
                     <div class="form-group">
                         <label><i class="fa-solid fa-lock"></i> Mật khẩu</label>
-                        <input type="password" id="password" placeholder="Nhập mật khẩu" required>
+                        <input type="password" id="password" placeholder="Nhập mật khẩu">
+                        <small id="password-error" class="text-danger" style="display: none; font-size: 0.85rem; margin-top: 4px;"></small>
                     </div>
+                    <small id="form-error" class="text-danger" style="display: none; font-size: 0.85rem; text-align: center; margin-top: 4px; margin-bottom: 8px; font-weight: bold;"></small>
                     <button type="submit" class="btn-secondary">Đăng nhập</button>
                 </form>
                 
@@ -76,8 +78,8 @@ export function renderSignup() {
                         <input type="text" id="reg-name" placeholder="Ví dụ: Nguyễn Văn A" required>
                     </div>
                     <div class="form-group">
-                        <label>Email</label>
-                        <input type="email" id="reg-email" placeholder="Email của bạn" required>
+                        <label>username</label>
+                        <input type="text" id="reg-username" placeholder="username" required>
                     </div>
                     <div class="form-group">
                         <label>Mật khẩu</label>
@@ -104,36 +106,92 @@ export function renderSignup() {
     .getElementById("signup-form")
     .addEventListener("submit", async (e) => {
       e.preventDefault();
-      const name = document.getElementById("reg-name").value;
-      const userName = document.getElementById("reg-email").value; // Using email field as username
-      const password = document.getElementById("reg-password").value;
-      const urlParams = new URLSearchParams(window.location.search);
-      const nfcTagId = urlParams.get('nfc_tag_id') || 'DEMO_NFC';
-      
-      try {
-          await AuthAPI.signup({ name, user_name: userName, user_password: password, nfc_tag_id: nfcTagId });
-          showToast("Đăng ký thành công! Vui lòng đăng nhập.", "success");
-          renderLogin();
-      } catch (err) {
-          showToast("Lỗi đăng ký: " + err.message, "error");
-      }
+      // Gọi API Signup ở đây, giả lập thành công:
+      showToast("Đăng ký thành công! Vui lòng đăng nhập.", "success");
+      renderLogin();
     });
 }
 
 async function handleEmailLogin(e) {
   e.preventDefault();
-  const userName = document.getElementById("email").value; // form label is email but we use user_name
-  const password = document.getElementById("password").value;
+
+  const userErr = document.getElementById("username-error");
+  const passErr = document.getElementById("password-error");
+  const formErr = document.getElementById("form-error");
+  const userInp = document.getElementById("username");
+  const passInp = document.getElementById("password");
+
+  // Đặt lại trạng thái ban đầu
+  userErr.style.display = "none";
+  passErr.style.display = "none";
+  formErr.style.display = "none";
+  userInp.style.borderColor = "var(--border-glass)";
+  passInp.style.borderColor = "var(--border-glass)";
+
+  const usernameInput = userInp.value.trim();
+  const passwordInput = passInp.value;
+
+  let hasError = false;
+
+  if (!usernameInput) {
+    userErr.innerText = "Vui lòng nhập tên đăng nhập.";
+    userErr.style.display = "block";
+    userInp.style.borderColor = "var(--danger)";
+    hasError = true;
+  }
+
+  if (!passwordInput) {
+    passErr.innerText = "Vui lòng nhập mật khẩu.";
+    passErr.style.display = "block";
+    passInp.style.borderColor = "var(--danger)";
+    hasError = true;
+  }
+
+  if (hasError) return;
+
+  const payload = {
+    user_name: usernameInput,
+    user_password: passwordInput,
+  };
+
   try {
-      const res = await AuthAPI.login({ user_name: userName, user_password: password });
-      if (res.nfc_tag_id) {
-          localStorage.setItem("userId", res.nfc_tag_id);
-          loadDashboard();
-      } else {
-          showToast("Đăng nhập thất bại, sai tài khoản hoặc mật khẩu.", "error");
+    const res = await fetch(
+      "https://hcibackend.up.railway.app/api/users/login",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+    );
+
+    const data = await res.json().catch(() => ({}));
+
+    if (res.ok) {
+      // API hiện tại trả về { message: "...", user: { user_id: "..." } }
+      const userIdToStore = data.user?.user_id || data.user_id || data.id;
+
+      if (!userIdToStore) {
+        showToast("Lỗi: Máy chủ không trả về ID người dùng!", "error");
+        return;
       }
-  } catch (err) {
-      showToast("Lỗi đăng nhập: " + err.message, "error");
+
+      localStorage.setItem("userId", userIdToStore);
+      if (data.token) {
+        localStorage.setItem("token", data.token);
+      }
+      showToast("Đăng nhập thành công!", "success");
+      loadDashboard();
+    } else {
+      // API lỗi hoặc tài khoản sai
+      formErr.innerText =
+        data.message || data.error || "Tài khoản hoặc mật khẩu không đúng!";
+      formErr.style.display = "block";
+      userInp.style.borderColor = "var(--danger)";
+      passInp.style.borderColor = "var(--danger)";
+    }
+  } catch (error) {
+    formErr.innerText = "Lỗi kết nối đến máy chủ. Vui lòng thử lại sau!";
+    formErr.style.display = "block";
   }
 }
 

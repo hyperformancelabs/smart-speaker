@@ -1,13 +1,19 @@
-import { renderAlarms } from '../components/alarms.js';
-import { renderTimers } from '../components/timers.js';
-import { renderLists } from '../components/lists.js';
-import { renderProfile } from '../components/profile.js';
-import { renderMedia } from '../components/media.js';
-import { ProfileAPI, AlarmAPI, TimerAPI, ListAPI, MediaAPI } from '../services/api.js';
+import { renderAlarms } from "../components/alarms.js";
+import { renderLists } from "../components/lists.js";
+import { renderMedia } from "../components/media.js";
+import { renderProfile } from "../components/profile.js";
+import { renderTimers } from "../components/timers.js";
+import {
+  AlarmAPI,
+  ListAPI,
+  MediaAPI,
+  ProfileAPI,
+  TimerAPI,
+} from "../services/api.js";
 
 export function loadDashboard() {
-    const app = document.getElementById('app');
-    app.innerHTML = `
+  const app = document.getElementById("app");
+  app.innerHTML = `
         <div class="dashboard-layout">
             <!-- Mobile Header cho màn hình nhỏ -->
             <div class="mobile-header">
@@ -66,75 +72,82 @@ export function loadDashboard() {
         </div>
     `;
 
-    document.getElementById('btn-logout').addEventListener('click', () => {
-        localStorage.clear();
-        window.location.reload();
+  document.getElementById("btn-logout").addEventListener("click", () => {
+    showConfirm("Bạn có chắc chắn muốn đăng xuất tài khoản này không?", () => {
+      localStorage.clear();
+      window.location.reload();
     });
+  });
 
-    // Logic Đóng / Mở menu trên mobile
-    const sidebar = document.getElementById('sidebar');
-    const overlay = document.getElementById('sidebar-overlay');
-    const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+  // Logic Đóng / Mở menu trên mobile
+  const sidebar = document.getElementById("sidebar");
+  const overlay = document.getElementById("sidebar-overlay");
+  const mobileMenuBtn = document.getElementById("mobile-menu-btn");
 
-    mobileMenuBtn.addEventListener('click', () => {
-        sidebar.classList.add('open');
-        overlay.classList.add('open');
-    });
+  mobileMenuBtn.addEventListener("click", () => {
+    sidebar.classList.add("open");
+    overlay.classList.add("open");
+  });
 
-    overlay.addEventListener('click', () => {
-        sidebar.classList.remove('open');
-        overlay.classList.remove('open');
-    });
+  overlay.addEventListener("click", () => {
+    sidebar.classList.remove("open");
+    overlay.classList.remove("open");
+  });
 
-    const menus = [
-        { id: 'menu-overview', render: renderOverview },
-        { id: 'menu-alarms', render: renderAlarms },
-        { id: 'menu-timers', render: renderTimers },
-        { id: 'menu-lists', render: renderLists },
-        { id: 'menu-media', render: renderMedia },
-        { id: 'menu-profile', render: renderProfile }
-    ];
+  const menus = [
+    { id: "menu-overview", render: renderOverview },
+    { id: "menu-alarms", render: renderAlarms },
+    { id: "menu-timers", render: renderTimers },
+    { id: "menu-lists", render: renderLists },
+    { id: "menu-media", render: renderMedia },
+    { id: "menu-profile", render: renderProfile },
+  ];
 
-    menus.forEach(menu => {
-        const el = document.getElementById(menu.id);
-        if(el) {
-            el.addEventListener('click', () => {
-                document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
-                el.classList.add('active');
-                menu.render();
-                if(sidebar.classList.contains('open')) {
-                    sidebar.classList.remove('open');
-                    overlay.classList.remove('open');
-                }
-            });
+  menus.forEach((menu) => {
+    const el = document.getElementById(menu.id);
+    if (el) {
+      el.addEventListener("click", () => {
+        document
+          .querySelectorAll(".nav-item")
+          .forEach((nav) => nav.classList.remove("active"));
+        el.classList.add("active");
+        menu.render();
+        if (sidebar.classList.contains("open")) {
+          sidebar.classList.remove("open");
+          overlay.classList.remove("open");
         }
-    });
+      });
+    }
+  });
 
-    // Mặc định load Overview
+  // Mặc định load Overview
+  renderOverview();
+
+  // Logo Click cũng về Overview
+  document.getElementById("logo-btn").addEventListener("click", () => {
+    document
+      .querySelectorAll(".nav-item")
+      .forEach((nav) => nav.classList.remove("active"));
+    document.getElementById("menu-overview").classList.add("active");
     renderOverview();
-    
-    // Logo Click cũng về Overview
-    document.getElementById('logo-btn').addEventListener('click', () => {
-        document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
-        document.getElementById('menu-overview').classList.add('active');
-        renderOverview();
-        if(sidebar.classList.contains('open')) {
-            sidebar.classList.remove('open');
-            overlay.classList.remove('open');
-        }
-    });
+    if (sidebar.classList.contains("open")) {
+      sidebar.classList.remove("open");
+      overlay.classList.remove("open");
+    }
+  });
 }
 
 let cachedOverview = null;
 
 async function renderOverview(silent = false) {
-    const content = document.getElementById('main-content');
+  const content = document.getElementById("main-content");
 
-    const buildUI = (data) => {
-        const { profile, activeAlarms, activeTimers, totalNotes, totalMedia } = data;
-        content.innerHTML = `
+  const buildUI = (data) => {
+    const { profile, activeAlarms, activeTimers, totalNotes, totalMedia } =
+      data;
+    content.innerHTML = `
             <div class="welcome-banner glass-panel" style="margin-bottom: 2rem;">
-                <h3>Chào mừng ${profile.name || 'Người dùng'} quay lại! ✨</h3>
+                <h3>Chào mừng ${profile.name || "Người dùng"} quay lại! ✨</h3>
                 <p>Khám phá nhanh trạng thái phòng thông minh của bạn hôm nay.</p>
             </div>
             
@@ -169,47 +182,50 @@ async function renderOverview(silent = false) {
                 </div>
             </div>
         `;
-    };
+  };
 
-    if (!silent && !cachedOverview) {
-        content.innerHTML = `
+  if (!silent && !cachedOverview) {
+    content.innerHTML = `
             <div class="glass-panel content-loading" style="margin-top: 2rem;">
                 <i class="fa-solid fa-circle-notch fa-spin"></i> Đang tải dữ liệu tổng quan...
             </div>
         `;
-    } else if (!silent && cachedOverview) {
-        buildUI(cachedOverview);
+  } else if (!silent && cachedOverview) {
+    buildUI(cachedOverview);
+  }
+
+  try {
+    const [profile, alarms, timers, lists, media] = await Promise.all([
+      ProfileAPI.get().catch(() => ({ name: "Người dùng" })),
+      AlarmAPI.getAll().catch(() => []),
+      TimerAPI.getAll().catch(() => []),
+      ListAPI.getAll().catch(() => []),
+      MediaAPI.getAll().catch(() => []),
+    ]);
+
+    const newData = {
+      profile,
+      activeAlarms: alarms.filter((a) => a.enabled).length,
+      activeTimers: timers.filter((t) => t.active).length,
+      totalNotes: lists.reduce(
+        (sum, list) => sum + (list.items ? list.items.length : 0),
+        0,
+      ),
+      totalMedia: media.length,
+    };
+
+    if (JSON.stringify(newData) !== JSON.stringify(cachedOverview)) {
+      cachedOverview = newData;
+      buildUI(newData);
     }
-
-    try {
-        const [profile, alarms, timers, lists, media] = await Promise.all([
-            ProfileAPI.get().catch(() => ({ name: 'Người dùng' })),
-            AlarmAPI.getAll().catch(() => []),
-            TimerAPI.getAll().catch(() => []),
-            ListAPI.getAll().catch(() => []),
-            MediaAPI.getAll().catch(() => [])
-        ]);
-
-        const newData = {
-            profile,
-            activeAlarms: alarms.filter(a => a.enabled).length,
-            activeTimers: timers.filter(t => t.active).length,
-            totalNotes: lists.reduce((sum, list) => sum + (list.items ? list.items.length : 0), 0),
-            totalMedia: media.length
-        };
-
-        if (JSON.stringify(newData) !== JSON.stringify(cachedOverview)) {
-            cachedOverview = newData;
-            buildUI(newData);
-        }
-    } catch (e) {
-        if (!cachedOverview) {
-            content.innerHTML = `
+  } catch (e) {
+    if (!cachedOverview) {
+      content.innerHTML = `
                 <div class="welcome-banner glass-panel">
                     <h3>Chào mừng quay lại! ✨</h3>
                     <p>Chọn một chức năng trên thanh menu bên trái để bắt đầu quản lý không gian của bạn.</p>
                 </div>
             `;
-        }
     }
+  }
 }
