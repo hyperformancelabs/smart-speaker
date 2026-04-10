@@ -8,6 +8,7 @@ from enum import Enum
 class DeviceAudioSessionState(str, Enum):
     WAIT_WAKEWORD = "wait_wakeword"
     STREAMING = "streaming"
+    THINKING = "thinking"
 
     @classmethod
     def from_value(cls, value: object) -> "DeviceAudioSessionState":

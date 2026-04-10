@@ -49,6 +49,7 @@ constexpr int kSleepMouthX = 42;
 constexpr int kSleepMouthY = 41;
 constexpr int kSleepMouthWidth = 44;
 constexpr int kSleepMouthHeight = 9;
+constexpr uint8_t kThinkingDotCount = 3;
 
 void drawCenteredLines(const char *const lines[], uint8_t lineCount, int startY, int lineGap) {
     display.clearDisplay();
@@ -199,12 +200,18 @@ void drawClosedEye(int centerX, int centerY) {
     display.drawPixel(centerX + 4, centerY + 2, SSD1306_WHITE);
 }
 
-void drawOpenEye(int centerX, int centerY) {
+void drawEye(int centerX, int centerY, int pupilOffsetX, int pupilOffsetY) {
     display.fillRoundRect(centerX - 12, centerY - 7, 24, 14, 6, SSD1306_WHITE);
     display.drawRoundRect(centerX - 11, centerY - 6, 22, 12, 5, SSD1306_BLACK);
-    display.fillCircle(centerX, centerY, 3, SSD1306_BLACK);
-    display.drawPixel(centerX - 1, centerY - 1, SSD1306_WHITE);
-    display.drawPixel(centerX, centerY - 2, SSD1306_WHITE);
+    const int pupilX = centerX + pupilOffsetX;
+    const int pupilY = centerY + pupilOffsetY;
+    display.fillCircle(pupilX, pupilY, 3, SSD1306_BLACK);
+    display.drawPixel(pupilX - 1, pupilY - 1, SSD1306_WHITE);
+    display.drawPixel(pupilX, pupilY - 2, SSD1306_WHITE);
+}
+
+void drawOpenEye(int centerX, int centerY) {
+    drawEye(centerX, centerY, 0, 0);
 }
 
 void drawCheek(int centerX, int centerY) {
@@ -239,6 +246,56 @@ void drawSleepMouth() {
         kSleepMouthX + kSleepMouthWidth - 7,
         kSleepMouthY + (kSleepMouthHeight / 2),
         SSD1306_BLACK);
+}
+
+void drawThinkingBrows() {
+    display.drawLine(kLeftEyeCenterX - 12, kEyeCenterY - 12, kLeftEyeCenterX + 9, kEyeCenterY - 14, SSD1306_WHITE);
+    display.drawLine(kLeftEyeCenterX - 12, kEyeCenterY - 11, kLeftEyeCenterX + 9, kEyeCenterY - 13, SSD1306_WHITE);
+    display.drawLine(kRightEyeCenterX - 9, kEyeCenterY - 14, kRightEyeCenterX + 12, kEyeCenterY - 12, SSD1306_WHITE);
+    display.drawLine(kRightEyeCenterX - 9, kEyeCenterY - 13, kRightEyeCenterX + 12, kEyeCenterY - 11, SSD1306_WHITE);
+}
+
+void drawThinkingMouth(unsigned long elapsedMs) {
+    constexpr int mouthX = kMouthBoxX + 10;
+    constexpr int mouthY = kMouthBoxY + 1;
+    constexpr int mouthWidth = kMouthBoxWidth - 20;
+    constexpr int mouthHeight = kMouthBoxHeight - 2;
+    constexpr int dotSpacing = 11;
+    const uint8_t activeDot = (elapsedMs / 280) % kThinkingDotCount;
+    const uint8_t trailDot = (activeDot + kThinkingDotCount - 1) % kThinkingDotCount;
+    const int dotCenterY = mouthY + (mouthHeight / 2);
+    const int dotStartX = mouthX + 11;
+
+    display.drawRoundRect(mouthX, mouthY, mouthWidth, mouthHeight, 4, SSD1306_WHITE);
+    display.drawLine(mouthX + 8, mouthY + mouthHeight + 2, mouthX + mouthWidth - 10, mouthY + mouthHeight + 2, SSD1306_WHITE);
+
+    for (uint8_t i = 0; i < kThinkingDotCount; ++i) {
+        const int dotCenterX = dotStartX + (i * dotSpacing);
+        if (i == activeDot) {
+            display.fillCircle(dotCenterX, dotCenterY, 2, SSD1306_WHITE);
+        } else if (i == trailDot) {
+            display.drawCircle(dotCenterX, dotCenterY, 2, SSD1306_WHITE);
+        } else {
+            display.drawPixel(dotCenterX, dotCenterY, SSD1306_WHITE);
+        }
+    }
+}
+
+void drawThinkingDecoration(unsigned long elapsedMs) {
+    constexpr int dotX[kThinkingDotCount] = {90, 101, 112};
+    constexpr int dotY[kThinkingDotCount] = {12, 7, 11};
+    const uint8_t activeDot = (elapsedMs / 360) % kThinkingDotCount;
+    const uint8_t trailDot = (activeDot + kThinkingDotCount - 1) % kThinkingDotCount;
+
+    for (uint8_t i = 0; i < kThinkingDotCount; ++i) {
+        if (i == activeDot) {
+            display.fillCircle(dotX[i], dotY[i], 2, SSD1306_WHITE);
+        } else if (i == trailDot) {
+            display.drawCircle(dotX[i], dotY[i], 2, SSD1306_WHITE);
+        } else {
+            display.drawPixel(dotX[i], dotY[i], SSD1306_WHITE);
+        }
+    }
 }
 
 void drawWaveformInRect(const int16_t rawData[],
@@ -501,6 +558,23 @@ void oledDrawStreamingFace(const int16_t rawData[], int rawLen) {
     drawCheek(27, 42);
     drawCheek(101, 42);
     drawWaveformInRect(rawData, rawLen, kMouthBoxX, kMouthBoxY, kMouthBoxWidth, kMouthBoxHeight);
+
+    display.display();
+}
+
+void oledDrawThinkingFace(unsigned long elapsedMs) {
+    display.clearDisplay();
+    display.setFont();
+    display.setTextSize(1);
+
+    drawRobotHeadFrame();
+    drawEye(kLeftEyeCenterX, kEyeCenterY, -2, -1);
+    drawEye(kRightEyeCenterX, kEyeCenterY, 3, -2);
+    drawThinkingBrows();
+    drawCheek(27, 42);
+    drawCheek(101, 42);
+    drawThinkingMouth(elapsedMs);
+    drawThinkingDecoration(elapsedMs);
 
     display.display();
 }

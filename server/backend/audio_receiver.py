@@ -359,26 +359,12 @@ class CaptureSession:
                 f"failed to transcribe first utterance with faster-whisper: {exc}"
             ) from exc
 
-    def _handle_first_utterance(self, ws: websocket.WebSocket, segment: SpeechSegment) -> bool:
-        detected_at = datetime.now(timezone.utc).isoformat()
-        directive = AudioSessionDirective(
-            state=self.request.first_utterance_state,
-            reason="first_utterance_detected",
-            stop_capture=self.request.resolved_stop_after_first_utterance(),
-        )
-
-        try:
-            utterance_path = self._save_first_utterance(segment)
-        except OSError as exc:
-            raise FirstUtteranceProcessingError(
-                f"failed to persist first utterance audio: {exc}"
-            ) from exc
-
+    def _send_audio_session_directive(
+        self,
+        ws: websocket.WebSocket,
+        directive: AudioSessionDirective,
+    ) -> None:
         self._update_status(
-            first_utterance_path=str(utterance_path),
-            first_utterance_duration_seconds=round(segment.duration_seconds, 3),
-            first_utterance_completed_at=detected_at,
-            first_utterance_completion_reason=segment.completion_reason,
             device_state_signal=directive.state.value,
             device_state_signal_reason=directive.reason,
             device_state_signal_error=None,
@@ -393,9 +379,66 @@ class CaptureSession:
             ) from exc
 
         self._update_status(device_state_signal_sent_at=datetime.now(timezone.utc).isoformat())
+
+    def _send_return_to_wait_wakeword(
+        self,
+        ws: websocket.WebSocket,
+        reason: str,
+    ) -> None:
+        self._send_audio_session_directive(
+            ws,
+            AudioSessionDirective(
+                state=DeviceAudioSessionState.WAIT_WAKEWORD,
+                reason=reason,
+                stop_capture=True,
+            ),
+        )
         time.sleep(DEFAULT_CONTROL_SIGNAL_SETTLE_SECONDS)
 
-        transcription = self._transcribe_first_utterance(utterance_path)
+    def _handle_first_utterance(self, ws: websocket.WebSocket, segment: SpeechSegment) -> bool:
+        detected_at = datetime.now(timezone.utc).isoformat()
+        should_roundtrip_through_thinking = (
+            self.request.first_utterance_state == DeviceAudioSessionState.THINKING
+        )
+        directive = AudioSessionDirective(
+            state=self.request.first_utterance_state,
+            reason="first_utterance_detected",
+            # Keep the websocket alive during the thinking screen so the server
+            # can return the device to wait_wakeword after transcription finishes.
+            stop_capture=False
+            if should_roundtrip_through_thinking
+            else self.request.resolved_stop_after_first_utterance(),
+        )
+
+        try:
+            utterance_path = self._save_first_utterance(segment)
+        except OSError as exc:
+            raise FirstUtteranceProcessingError(
+                f"failed to persist first utterance audio: {exc}"
+            ) from exc
+
+        self._update_status(
+            first_utterance_path=str(utterance_path),
+            first_utterance_duration_seconds=round(segment.duration_seconds, 3),
+            first_utterance_completed_at=detected_at,
+            first_utterance_completion_reason=segment.completion_reason,
+            device_state_signal_error=None,
+        )
+
+        initial_signal_sent = False
+        try:
+            self._send_audio_session_directive(ws, directive)
+            initial_signal_sent = True
+            time.sleep(DEFAULT_CONTROL_SIGNAL_SETTLE_SECONDS)
+            transcription = self._transcribe_first_utterance(utterance_path)
+        except FirstUtteranceProcessingError:
+            if should_roundtrip_through_thinking and initial_signal_sent:
+                try:
+                    self._send_return_to_wait_wakeword(ws, "first_utterance_processing_failed")
+                except FirstUtteranceProcessingError:
+                    pass
+            raise
+
         transcript_text = transcription.text or ""
         transcript_display = transcript_text if transcript_text else "<empty>"
         if transcription.language:
@@ -410,6 +453,11 @@ class CaptureSession:
             first_utterance_transcript=transcript_text or None,
             first_utterance_language=transcription.language,
         )
+
+        if should_roundtrip_through_thinking:
+            self._send_return_to_wait_wakeword(ws, "transcription_completed")
+            self._update_status(state="completed")
+            return True
 
         if directive.stop_capture:
             self._update_status(state="completed")

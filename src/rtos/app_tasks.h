@@ -3,6 +3,7 @@
 enum class ExternalAudioSessionState {
     WaitWakeword,
     Streaming,
+    Thinking,
 };
 
 void appTasksStart();

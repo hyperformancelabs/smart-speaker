@@ -57,6 +57,7 @@ enum class UiMode {
     Greeting,
     WaitWakeword,
     Streaming,
+    Thinking,
 };
 
 enum class AudioSessionMode {
@@ -228,6 +229,7 @@ AudioSessionMode audioSessionModeForUi(UiMode uiMode) {
             return AudioSessionMode::WaitWakeword;
         case UiMode::Streaming:
             return AudioSessionMode::Streaming;
+        case UiMode::Thinking:
         case UiMode::Splash:
         case UiMode::WifiReconnect:
         case UiMode::AwaitNfc:
@@ -318,6 +320,8 @@ UiMode uiModeForExternalAudioSessionState(ExternalAudioSessionState state) {
             return UiMode::WaitWakeword;
         case ExternalAudioSessionState::Streaming:
             return UiMode::Streaming;
+        case ExternalAudioSessionState::Thinking:
+            return UiMode::Thinking;
     }
 
     return UiMode::WaitWakeword;
@@ -349,6 +353,8 @@ bool shouldPollRfid(UiMode uiMode, bool profileLookupPending) {
         case UiMode::WaitWakeword:
         case UiMode::Streaming:
             return true;
+        case UiMode::Thinking:
+            return false;
         case UiMode::Splash:
         case UiMode::WifiReconnect:
         case UiMode::Loading:
@@ -370,6 +376,7 @@ bool shouldShowWifiReconnect(UiMode uiMode, bool profileLookupPending, WifiConne
         case UiMode::RegisterPrompt:
         case UiMode::WaitWakeword:
         case UiMode::Streaming:
+        case UiMode::Thinking:
         case UiMode::WifiReconnect:
             return true;
         case UiMode::Splash:
@@ -680,7 +687,8 @@ void uiTask(void *param) {
 
         ExternalAudioSessionState nextExternalState = ExternalAudioSessionState::WaitWakeword;
         if (consumeExternalAudioSessionState(nextExternalState) &&
-            (uiMode == UiMode::WaitWakeword || uiMode == UiMode::Streaming)) {
+            (uiMode == UiMode::WaitWakeword || uiMode == UiMode::Streaming ||
+             uiMode == UiMode::Thinking)) {
             setUiMode(uiMode, uiModeForExternalAudioSessionState(nextExternalState), lastUiFrameMs);
         }
 
@@ -712,6 +720,9 @@ void uiTask(void *param) {
                 case UiMode::Streaming:
                     oledDrawStreamingFace(snapshot.latestAudio.samples, snapshot.latestAudio.len);
                     serialSendPlotter(snapshot.latestAudio.samples, snapshot.latestAudio.len, 0);
+                    break;
+                case UiMode::Thinking:
+                    oledDrawThinkingFace(now);
                     break;
                 case UiMode::Splash:
                     break;
@@ -805,6 +816,8 @@ const char *appExternalAudioSessionStateName(ExternalAudioSessionState state) {
             return "wait_wakeword";
         case ExternalAudioSessionState::Streaming:
             return "streaming";
+        case ExternalAudioSessionState::Thinking:
+            return "thinking";
     }
 
     return "wait_wakeword";

@@ -21,7 +21,7 @@ constexpr uint16_t kVoiceBackendConnectTimeoutMs = 2500;
 constexpr uint16_t kVoiceBackendRequestTimeoutMs = 6500;
 constexpr unsigned long kVoiceBackendWifiReadyWaitMs = 1500;
 constexpr char kVoiceBackendPath[] = "/api/audio/start";
-constexpr char kFirstUtteranceState[] = "wait_wakeword";
+constexpr char kFirstUtteranceState[] = "thinking";
 
 bool extractJsonStringField(const String &payload, const char *fieldName, String &value) {
     value = "";
@@ -68,6 +68,11 @@ bool parseExternalAudioSessionState(const String &value, ExternalAudioSessionSta
 
     if (value.equalsIgnoreCase("streaming")) {
         state = ExternalAudioSessionState::Streaming;
+        return true;
+    }
+
+    if (value.equalsIgnoreCase("thinking")) {
+        state = ExternalAudioSessionState::Thinking;
         return true;
     }
 
