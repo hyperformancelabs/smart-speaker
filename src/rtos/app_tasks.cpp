@@ -13,6 +13,7 @@
 #include "app_state.h"
 #include "audio/audio_service.h"
 #include "net/profile_service.h"
+#include "net/voice_backend_service.h"
 #include "net/wifi_service.h"
 #include "net/ws_service.h"
 #include "secrets.h"
@@ -37,9 +38,8 @@ constexpr uint32_t kUiSleepMs = 20;
 constexpr uint32_t kNetworkSleepMs = 5;
 constexpr uint32_t kProfileTaskPollMs = 250;
 constexpr unsigned long kWifiReconnectKickMs = 1000;
-constexpr unsigned long kProfileWarmupRetryMs = 3000;
 constexpr unsigned long kRegisterPromptRecheckMs = 3000;
-constexpr size_t kAudioQueueDepth = 8;
+constexpr size_t kAudioQueueDepth = 32;
 constexpr size_t kBeepQueueDepth = 6;
 constexpr size_t kProfileLookupQueueDepth = 1;
 constexpr int kRfidBeepFreq = 900;
@@ -497,6 +497,7 @@ void networkTask(void *param) {
         if (!streamingActive) {
             streamingActive = true;
             audioResetWsFrames();
+            voiceBackendStartCapture();
         }
 
         bool drainedAnyChunk = false;
@@ -519,30 +520,10 @@ void profileLookupTask(void *param) {
 
     ProfileLookupRequest lookupRequest = {};
     ProfileLookupResult lookupResult = {};
-    bool wifiWasReady = false;
-    bool warmupPending = true;
-    unsigned long lastWarmupAttemptMs = 0;
 
     for (;;) {
-        const bool wifiReady = wifiIsReady();
-        if (wifiReady && !wifiWasReady) {
-            warmupPending = true;
-        }
-        wifiWasReady = wifiReady;
-
         if (xQueueReceive(gProfileLookupRequestQueue, &lookupRequest, pdMS_TO_TICKS(kProfileTaskPollMs)) !=
             pdPASS) {
-            if (!warmupPending || !wifiReady) {
-                continue;
-            }
-
-            const unsigned long now = millis();
-            if (lastWarmupAttemptMs != 0 && now - lastWarmupAttemptMs < kProfileWarmupRetryMs) {
-                continue;
-            }
-
-            lastWarmupAttemptMs = now;
-            warmupPending = !profileWarmupConnection();
             continue;
         }
 
@@ -551,9 +532,6 @@ void profileLookupTask(void *param) {
         lookupResult = {};
         copyText(lookupResult.uid, sizeof(lookupResult.uid), lookupRequest.uid);
         lookupResult.requestOk = profileFetchStatus(lookupRequest.uid, lookupResult.status);
-        if (lookupResult.requestOk) {
-            warmupPending = false;
-        }
         xQueueOverwrite(gProfileLookupResultQueue, &lookupResult);
     }
 }

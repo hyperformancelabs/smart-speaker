@@ -14,7 +14,12 @@
 #define WIFI_AP_SSID      "ESP32-Audio"
 #define WIFI_AP_PASSWORD  "12345678"
 
-// Shared base URL for both the device API calls and the registration page.
-#define SERVER_URL "your.server.url"
+// Single public base URL for browser-facing registration and cloud access.
+#define SERVER_URL "https://ssproject.hyperformancelabs.click"
+
+// ESP32 should prefer local plain HTTP on the same LAN to avoid TLS memory pressure.
+// Replace 192.168.1.9 with the IP of the machine running the local services.
+#define DEVICE_API_URL "http://192.168.1.9:8386"
+#define DEVICE_VOICE_BACKEND_URL "http://192.168.1.9:8387"
 
 #endif

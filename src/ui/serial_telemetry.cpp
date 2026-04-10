@@ -23,6 +23,10 @@ void serialTelemetryBegin() {
 }
 
 void serialSendPlotter(const int16_t rawData[], int rawLen, int cardEvent) {
+    if (!SERIAL_ENABLE_PLOTTER) {
+        return;
+    }
+
     int points = min(rawLen, SERIAL_RAW_LINES);
     if (points <= 0) {
         Serial.println(">raw:0");

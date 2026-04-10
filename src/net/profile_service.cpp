@@ -1,11 +1,17 @@
 #include "net/profile_service.h"
 
 #include <cstring>
+#include <esp_system.h>
 #include <HTTPClient.h>
+#include <WiFiClient.h>
 #include <WiFiClientSecure.h>
 
 #include "net/wifi_service.h"
 #include "secrets.h"
+
+#ifndef DEVICE_API_URL
+#define DEVICE_API_URL SERVER_URL
+#endif
 
 namespace {
 constexpr uint16_t kProfileConnectTimeoutMs = 2500;
@@ -14,7 +20,6 @@ constexpr uint8_t kProfileMaxAttempts = 2;
 constexpr unsigned long kProfileRetryDelayMs = 200;
 constexpr unsigned long kProfileWifiReadyWaitMs = 1500;
 constexpr int kProfileIncompleteHttpCode = 412;
-
 struct HttpTextResponse {
     int code = 0;
     String body;
@@ -35,24 +40,58 @@ void copyText(char dest[], size_t destSize, const char *src) {
 
 HttpTextResponse performGetTextRequest(const String &url) {
     HttpTextResponse response = {};
-    WiFiClientSecure client;
-    client.setInsecure();
+    Serial.printf("performGetTextRequest: free heap before request = %u bytes\n", ESP.getFreeHeap());
+    const bool useTls = url.startsWith("https://");
+    if (useTls) {
+        WiFiClientSecure client;
+        client.setInsecure();
+        HTTPClient http;
+        http.setConnectTimeout(kProfileConnectTimeoutMs);
+        http.setTimeout(kProfileRequestTimeoutMs);
+        if (!http.begin(client, url)) {
+            Serial.printf("performGetTextRequest: begin failed for %s\n", url.c_str());
+            response.code = HTTPC_ERROR_CONNECTION_REFUSED;
+            return response;
+        }
 
-    HTTPClient http;
-    http.setConnectTimeout(kProfileConnectTimeoutMs);
-    http.setTimeout(kProfileRequestTimeoutMs);
+        response.code = http.GET();
+        if (response.code < 0) {
+            Serial.printf("performGetTextRequest: %s -> %s (%d)\n",
+                          url.c_str(),
+                          HTTPClient::errorToString(response.code).c_str(),
+                          response.code);
+        } else {
+            Serial.printf("performGetTextRequest: %s -> HTTP %d\n", url.c_str(), response.code);
+        }
+        if (response.code > 0) {
+            response.body = http.getString();
+        }
+        http.end();
+    } else {
+        WiFiClient client;
+        HTTPClient http;
+        http.setConnectTimeout(kProfileConnectTimeoutMs);
+        http.setTimeout(kProfileRequestTimeoutMs);
+        if (!http.begin(client, url)) {
+            Serial.printf("performGetTextRequest: begin failed for %s\n", url.c_str());
+            response.code = HTTPC_ERROR_CONNECTION_REFUSED;
+            return response;
+        }
 
-    if (!http.begin(client, url)) {
-        response.code = HTTPC_ERROR_CONNECTION_REFUSED;
-        return response;
+        response.code = http.GET();
+        if (response.code < 0) {
+            Serial.printf("performGetTextRequest: %s -> %s (%d)\n",
+                          url.c_str(),
+                          HTTPClient::errorToString(response.code).c_str(),
+                          response.code);
+        } else {
+            Serial.printf("performGetTextRequest: %s -> HTTP %d\n", url.c_str(), response.code);
+        }
+        if (response.code > 0) {
+            response.body = http.getString();
+        }
+        http.end();
     }
-
-    response.code = http.GET();
-    if (response.code > 0) {
-        response.body = http.getString();
-    }
-
-    http.end();
     return response;
 }
 
@@ -98,7 +137,7 @@ bool profileFetchStatus(const char *uid, ProfileStatus &status) {
         return false;
     }
 
-    String url = String(SERVER_URL) + "/api/device/users/" + uid + "/profile-status";
+    String url = String(DEVICE_API_URL) + "/api/device/users/" + uid + "/profile-status";
 
     for (uint8_t attempt = 1; attempt <= kProfileMaxAttempts; ++attempt) {
         const HttpTextResponse response = performGetTextRequest(url);
@@ -131,20 +170,6 @@ bool profileFetchStatus(const char *uid, ProfileStatus &status) {
         delay(kProfileRetryDelayMs);
     }
 
-    return false;
-}
-
-bool profileWarmupConnection() {
-    if (!wifiWaitUntilReady(kProfileWifiReadyWaitMs)) {
-        return false;
-    }
-
-    const HttpTextResponse response = performGetTextRequest(String(SERVER_URL) + "/health");
-    if (response.code == HTTP_CODE_OK) {
-        return true;
-    }
-
-    logProfileRequestIssue("profileWarmupConnection", response.code, 1);
     return false;
 }
 

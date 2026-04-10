@@ -83,6 +83,8 @@ void wifiConnect() {
     lastWifiRetryMs = millis();
 #else
     WiFi.mode(WIFI_STA);
+    WiFi.setSleep(false);
+    WiFi.setAutoReconnect(true);
     WiFi.begin(WIFI_STA_SSID, WIFI_STA_PASSWORD);
     wifiAttemptStartedMs = millis();
     lastWifiRetryMs = wifiAttemptStartedMs;

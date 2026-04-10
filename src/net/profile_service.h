@@ -14,5 +14,4 @@ struct ProfileStatus {
 };
 
 bool profileFetchStatus(const char *uid, ProfileStatus &status);
-bool profileWarmupConnection();
 bool profileIsComplete(const ProfileStatus &status);

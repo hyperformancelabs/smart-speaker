@@ -50,6 +50,7 @@ constexpr int WAKEWORD_BEEP_MS = 70;
 
 constexpr unsigned long SERIAL_BAUD_RATE = 115200;
 constexpr int SERIAL_RAW_LINES = 32;
+constexpr bool SERIAL_ENABLE_PLOTTER = false;
 
 constexpr uint16_t WS_PORT = 81;
 constexpr unsigned long WIFI_TIMEOUT_MS = 15000;
