@@ -15,6 +15,7 @@ from typing import Callable
 import websocket
 
 try:
+    from .faster_whisper_stt import TranscriptionResult, transcribe_audio_file
     from .session_control import (
         AudioSessionDirective,
         DeviceAudioSessionState,
@@ -23,6 +24,7 @@ try:
     )
     from .silero_vad_segmenter import FirstUtteranceDetector, SileroVadConfig, SpeechSegment
 except ImportError:
+    from faster_whisper_stt import TranscriptionResult, transcribe_audio_file
     from session_control import (
         AudioSessionDirective,
         DeviceAudioSessionState,
@@ -293,6 +295,8 @@ class CaptureStatus:
     first_utterance_duration_seconds: float | None = None
     first_utterance_completed_at: str | None = None
     first_utterance_completion_reason: str | None = None
+    first_utterance_transcript: str | None = None
+    first_utterance_language: str | None = None
     device_state_signal: str | None = None
     device_state_signal_reason: str | None = None
     device_state_signal_sent_at: str | None = None
@@ -347,8 +351,21 @@ class CaptureSession:
         write_pcm_wav(path, self.audio_format, segment.pcm_bytes)
         return path
 
+    def _transcribe_first_utterance(self, utterance_path: Path) -> TranscriptionResult:
+        try:
+            return transcribe_audio_file(utterance_path)
+        except Exception as exc:
+            raise FirstUtteranceProcessingError(
+                f"failed to transcribe first utterance with faster-whisper: {exc}"
+            ) from exc
+
     def _handle_first_utterance(self, ws: websocket.WebSocket, segment: SpeechSegment) -> bool:
         detected_at = datetime.now(timezone.utc).isoformat()
+        directive = AudioSessionDirective(
+            state=self.request.first_utterance_state,
+            reason="first_utterance_detected",
+            stop_capture=self.request.resolved_stop_after_first_utterance(),
+        )
 
         try:
             utterance_path = self._save_first_utterance(segment)
@@ -357,11 +374,6 @@ class CaptureSession:
                 f"failed to persist first utterance audio: {exc}"
             ) from exc
 
-        directive = AudioSessionDirective(
-            state=self.request.first_utterance_state,
-            reason="first_utterance_detected",
-            stop_capture=self.request.resolved_stop_after_first_utterance(),
-        )
         self._update_status(
             first_utterance_path=str(utterance_path),
             first_utterance_duration_seconds=round(segment.duration_seconds, 3),
@@ -382,6 +394,22 @@ class CaptureSession:
 
         self._update_status(device_state_signal_sent_at=datetime.now(timezone.utc).isoformat())
         time.sleep(DEFAULT_CONTROL_SIGNAL_SETTLE_SECONDS)
+
+        transcription = self._transcribe_first_utterance(utterance_path)
+        transcript_text = transcription.text or ""
+        transcript_display = transcript_text if transcript_text else "<empty>"
+        if transcription.language:
+            print(
+                f"user said [{transcription.language}]: {transcript_display}",
+                flush=True,
+            )
+        else:
+            print(f"user said: {transcript_display}", flush=True)
+
+        self._update_status(
+            first_utterance_transcript=transcript_text or None,
+            first_utterance_language=transcription.language,
+        )
 
         if directive.stop_capture:
             self._update_status(state="completed")

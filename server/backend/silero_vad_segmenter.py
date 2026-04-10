@@ -37,7 +37,7 @@ class SileroVadConfig:
     final_pause_ms: int = 1200
     min_speech_ms: int = 300
     max_utterance_ms: int = 10_000
-    preroll_ms: int = 250
+    preroll_ms: int = 1000
 
     def validate(self) -> None:
         if self.sample_rate not in {8_000, 16_000}:
