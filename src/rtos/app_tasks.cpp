@@ -45,6 +45,7 @@ constexpr size_t kProfileLookupQueueDepth = 1;
 constexpr int kRfidBeepFreq = 900;
 constexpr int kRfidBeepMs = 80;
 constexpr unsigned long kGreetingDurationMs = 3000;
+constexpr int kNoPendingExternalAudioSessionState = -1;
 
 enum class UiMode {
     Splash,
@@ -89,6 +90,8 @@ QueueHandle_t gProfileLookupResultQueue = nullptr;
 bool gTasksStarted = false;
 volatile AudioSessionMode gAudioSessionMode = AudioSessionMode::Idle;
 volatile bool gWakewordTransitionPending = false;
+portMUX_TYPE gExternalAudioSessionStateMux = portMUX_INITIALIZER_UNLOCKED;
+volatile int gPendingExternalAudioSessionState = kNoPendingExternalAudioSessionState;
 
 void resetRealtimeAppState();
 
@@ -255,6 +258,24 @@ bool consumeWakewordTransition() {
     return true;
 }
 
+bool consumeExternalAudioSessionState(ExternalAudioSessionState &nextState) {
+    int pendingState = kNoPendingExternalAudioSessionState;
+
+    taskENTER_CRITICAL(&gExternalAudioSessionStateMux);
+    pendingState = gPendingExternalAudioSessionState;
+    if (pendingState != kNoPendingExternalAudioSessionState) {
+        gPendingExternalAudioSessionState = kNoPendingExternalAudioSessionState;
+    }
+    taskEXIT_CRITICAL(&gExternalAudioSessionStateMux);
+
+    if (pendingState == kNoPendingExternalAudioSessionState) {
+        return false;
+    }
+
+    nextState = static_cast<ExternalAudioSessionState>(pendingState);
+    return true;
+}
+
 void setAudioSessionMode(AudioSessionMode nextMode) {
     if (gAudioSessionMode == nextMode) {
         return;
@@ -289,6 +310,17 @@ bool isWakewordDetectionActive() {
 
 bool isStreamingActive() {
     return gAudioSessionMode == AudioSessionMode::Streaming;
+}
+
+UiMode uiModeForExternalAudioSessionState(ExternalAudioSessionState state) {
+    switch (state) {
+        case ExternalAudioSessionState::WaitWakeword:
+            return UiMode::WaitWakeword;
+        case ExternalAudioSessionState::Streaming:
+            return UiMode::Streaming;
+    }
+
+    return UiMode::WaitWakeword;
 }
 
 void resetRealtimeAppState() {
@@ -646,6 +678,12 @@ void uiTask(void *param) {
             setUiMode(uiMode, UiMode::Streaming, lastUiFrameMs);
         }
 
+        ExternalAudioSessionState nextExternalState = ExternalAudioSessionState::WaitWakeword;
+        if (consumeExternalAudioSessionState(nextExternalState) &&
+            (uiMode == UiMode::WaitWakeword || uiMode == UiMode::Streaming)) {
+            setUiMode(uiMode, uiModeForExternalAudioSessionState(nextExternalState), lastUiFrameMs);
+        }
+
         if (lastUiFrameMs == 0 || now - lastUiFrameMs >= kUiIntervalMs) {
             const AppState snapshot = loadAppStateSnapshot();
 
@@ -753,4 +791,21 @@ void appTasksStart() {
     createTask(profileLookupTask, "profile_lookup", 8192, kProfileTaskPriority, kNetworkCore);
     createTask(uiTask, "ui", 6144, kUiTaskPriority, kNetworkCore);
     createTask(beepTask, "beep", 4096, kBeepTaskPriority, kNetworkCore);
+}
+
+void appRequestExternalAudioSessionState(ExternalAudioSessionState nextState) {
+    taskENTER_CRITICAL(&gExternalAudioSessionStateMux);
+    gPendingExternalAudioSessionState = static_cast<int>(nextState);
+    taskEXIT_CRITICAL(&gExternalAudioSessionStateMux);
+}
+
+const char *appExternalAudioSessionStateName(ExternalAudioSessionState state) {
+    switch (state) {
+        case ExternalAudioSessionState::WaitWakeword:
+            return "wait_wakeword";
+        case ExternalAudioSessionState::Streaming:
+            return "streaming";
+    }
+
+    return "wait_wakeword";
 }

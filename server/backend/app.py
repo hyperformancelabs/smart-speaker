@@ -6,8 +6,13 @@ from flask import Flask, jsonify, request
 
 try:
     from .audio_receiver import DEFAULT_OUTPUT_DIR, CaptureRequest, capture_manager
+    from .session_control import (
+        DeviceAudioSessionState,
+        parse_device_audio_session_state,
+    )
 except ImportError:
     from audio_receiver import DEFAULT_OUTPUT_DIR, CaptureRequest, capture_manager
+    from session_control import DeviceAudioSessionState, parse_device_audio_session_state
 
 
 DEFAULT_SERVER_PORT = 8387
@@ -23,6 +28,22 @@ def normalize_path(value: str | None) -> str:
     return value if value.startswith("/") else f"/{value}"
 
 
+def parse_optional_bool(value: object) -> bool | None:
+    if value is None:
+        return None
+
+    if isinstance(value, bool):
+        return value
+
+    normalized = str(value).strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+
+    raise ValueError(f"invalid boolean value '{value}'")
+
+
 @app.route("/health", methods=["GET"])
 def health_check():
     return jsonify({"status": "ok", "service": "audio-backend"}), 200
@@ -34,6 +55,16 @@ def start_audio_capture():
     ws_host = str(payload.get("ws_host") or "").strip()
     if not ws_host:
         return jsonify({"error": "ws_host is required"}), 400
+
+    try:
+        first_utterance_state = parse_device_audio_session_state(
+            payload.get("first_utterance_state"),
+            default=DeviceAudioSessionState.WAIT_WAKEWORD,
+        )
+        enable_first_utterance_vad = parse_optional_bool(payload.get("enable_first_utterance_vad"))
+        stop_after_first_utterance = parse_optional_bool(payload.get("stop_after_first_utterance"))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
 
     output_dir_value = str(payload.get("output_dir") or "").strip()
     output_dir = Path(output_dir_value) if output_dir_value else DEFAULT_OUTPUT_DIR
@@ -48,6 +79,9 @@ def start_audio_capture():
         segment_seconds=payload.get("segment_seconds"),
         timeout_seconds=float(payload.get("timeout_seconds") or 5.0),
         retry_seconds=float(payload.get("retry_seconds") or 1.0),
+        enable_first_utterance_vad=True if enable_first_utterance_vad is None else enable_first_utterance_vad,
+        first_utterance_state=first_utterance_state,
+        stop_after_first_utterance=stop_after_first_utterance,
     )
 
     status = capture_manager.start(capture_request)

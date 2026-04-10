@@ -6,12 +6,30 @@ import struct
 import sys
 import threading
 import time
+import wave
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
 import websocket
+
+try:
+    from .session_control import (
+        AudioSessionDirective,
+        DeviceAudioSessionState,
+        build_audio_session_state_message,
+        default_stop_after_first_utterance,
+    )
+    from .silero_vad_segmenter import FirstUtteranceDetector, SileroVadConfig, SpeechSegment
+except ImportError:
+    from session_control import (
+        AudioSessionDirective,
+        DeviceAudioSessionState,
+        build_audio_session_state_message,
+        default_stop_after_first_utterance,
+    )
+    from silero_vad_segmenter import FirstUtteranceDetector, SileroVadConfig, SpeechSegment
 
 
 DEFAULT_SAMPLE_RATE = 16_000
@@ -22,6 +40,7 @@ DEFAULT_TIMEOUT_SECONDS = 5.0
 DEFAULT_RETRY_SECONDS = 1.0
 DEFAULT_OUTPUT_DIR = Path(__file__).resolve().parent / "recordings"
 DEFAULT_WS_PATH = "/"
+DEFAULT_CONTROL_SIGNAL_SETTLE_SECONDS = 0.05
 
 
 @dataclass(slots=True)
@@ -209,6 +228,15 @@ class WavSegmentSink:
         self._close_writer()
 
 
+def write_pcm_wav(path: Path, audio_format: AudioFormat, pcm_bytes: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with wave.open(str(path), "wb") as wav_file:
+        wav_file.setnchannels(audio_format.channels)
+        wav_file.setsampwidth(audio_format.sample_width)
+        wav_file.setframerate(audio_format.sample_rate)
+        wav_file.writeframes(pcm_bytes)
+
+
 def parse_audio_packet(packet: bytes, audio_format: AudioFormat) -> tuple[int, bytes]:
     if len(packet) < 4:
         raise ValueError("binary frame shorter than 4-byte sequence header")
@@ -235,10 +263,18 @@ class CaptureRequest:
     segment_seconds: float | None = None
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS
     retry_seconds: float | None = DEFAULT_RETRY_SECONDS
+    enable_first_utterance_vad: bool = True
+    first_utterance_state: DeviceAudioSessionState = DeviceAudioSessionState.WAIT_WAKEWORD
+    stop_after_first_utterance: bool | None = None
 
     def websocket_url(self) -> str:
         path = self.ws_path if self.ws_path.startswith("/") else f"/{self.ws_path}"
         return f"ws://{self.ws_host}:{self.ws_port}{path}"
+
+    def resolved_stop_after_first_utterance(self) -> bool:
+        if self.stop_after_first_utterance is not None:
+            return self.stop_after_first_utterance
+        return default_stop_after_first_utterance(self.first_utterance_state)
 
 
 @dataclass(slots=True)
@@ -253,7 +289,19 @@ class CaptureStatus:
     last_sequence: int | None = None
     output_dir: str = ""
     last_file_path: str | None = None
+    first_utterance_path: str | None = None
+    first_utterance_duration_seconds: float | None = None
+    first_utterance_completed_at: str | None = None
+    first_utterance_completion_reason: str | None = None
+    device_state_signal: str | None = None
+    device_state_signal_reason: str | None = None
+    device_state_signal_sent_at: str | None = None
+    device_state_signal_error: str | None = None
     error: str | None = None
+
+
+class FirstUtteranceProcessingError(RuntimeError):
+    pass
 
 
 class CaptureSession:
@@ -261,6 +309,12 @@ class CaptureSession:
         self.request = request
         self.audio_format = AudioFormat(sample_rate=request.sample_rate)
         self.stop_event = threading.Event()
+        self.first_utterance_config = (
+            SileroVadConfig(sample_rate=request.sample_rate)
+            if request.enable_first_utterance_vad
+            else None
+        )
+        self.first_utterance_detector: FirstUtteranceDetector | None = None
         self.status = CaptureStatus(
             session_id=datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ"),
             state="starting",
@@ -286,6 +340,54 @@ class CaptureSession:
             for key, value in changes.items():
                 setattr(self.status, key, value)
 
+    def _save_first_utterance(self, segment: SpeechSegment) -> Path:
+        path = self.request.output_dir / "utterances" / (
+            f"{self.request.prefix}_{self.status.session_id}_first_utterance.wav"
+        )
+        write_pcm_wav(path, self.audio_format, segment.pcm_bytes)
+        return path
+
+    def _handle_first_utterance(self, ws: websocket.WebSocket, segment: SpeechSegment) -> bool:
+        detected_at = datetime.now(timezone.utc).isoformat()
+
+        try:
+            utterance_path = self._save_first_utterance(segment)
+        except OSError as exc:
+            raise FirstUtteranceProcessingError(
+                f"failed to persist first utterance audio: {exc}"
+            ) from exc
+
+        directive = AudioSessionDirective(
+            state=self.request.first_utterance_state,
+            reason="first_utterance_detected",
+            stop_capture=self.request.resolved_stop_after_first_utterance(),
+        )
+        self._update_status(
+            first_utterance_path=str(utterance_path),
+            first_utterance_duration_seconds=round(segment.duration_seconds, 3),
+            first_utterance_completed_at=detected_at,
+            first_utterance_completion_reason=segment.completion_reason,
+            device_state_signal=directive.state.value,
+            device_state_signal_reason=directive.reason,
+            device_state_signal_error=None,
+        )
+
+        try:
+            ws.send(build_audio_session_state_message(directive))
+        except websocket.WebSocketException as exc:
+            self._update_status(device_state_signal_error=str(exc))
+            raise FirstUtteranceProcessingError(
+                f"failed to send device state '{directive.state.value}' over websocket: {exc}"
+            ) from exc
+
+        self._update_status(device_state_signal_sent_at=datetime.now(timezone.utc).isoformat())
+        time.sleep(DEFAULT_CONTROL_SIGNAL_SETTLE_SECONDS)
+
+        if directive.stop_capture:
+            self._update_status(state="completed")
+
+        return directive.stop_capture
+
     def _run(self) -> None:
         while True:
             sink = WavSegmentSink(
@@ -296,6 +398,11 @@ class CaptureSession:
             )
             last_seq: int | None = None
             ws: websocket.WebSocket | None = None
+            self.first_utterance_detector = (
+                FirstUtteranceDetector(self.first_utterance_config)
+                if self.first_utterance_config is not None
+                else None
+            )
 
             try:
                 print(f"connecting to {self.request.websocket_url()}", flush=True)
@@ -328,6 +435,20 @@ class CaptureSession:
                         last_file_path=str(sink.last_path) if sink.last_path else None,
                     )
 
+                    if self.first_utterance_detector is None:
+                        continue
+
+                    segment = self.first_utterance_detector.process_pcm_bytes(pcm_bytes)
+                    if segment is None:
+                        continue
+
+                    if self._handle_first_utterance(ws, segment):
+                        break
+
+            except FirstUtteranceProcessingError as exc:
+                print(f"first utterance processing error {self.request.websocket_url()}: {exc}", flush=True)
+                self._update_status(state="error", error=str(exc))
+                break
             except websocket.WebSocketBadStatusException as exc:
                 print(f"websocket handshake failed {self.request.websocket_url()}: {exc}", flush=True)
                 self._update_status(state="error", error=f"websocket handshake failed: {exc}")
@@ -356,6 +477,9 @@ class CaptureSession:
                     total_frames=sink.total_frames,
                     last_file_path=str(sink.last_path) if sink.last_path else self.status.last_file_path,
                 )
+
+            if self.snapshot()["state"] == "completed":
+                break
 
             if self.stop_event.is_set():
                 self._update_status(state="stopped")
@@ -428,7 +552,7 @@ def receive_stream(
 
     while not stop_requested:
         snapshot = session.snapshot()
-        if snapshot["state"] in {"stopped", "error"}:
+        if snapshot["state"] in {"stopped", "completed", "error"}:
             break
         time.sleep(0.2)
 
