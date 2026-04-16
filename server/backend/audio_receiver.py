@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import signal
 import struct
 import sys
@@ -15,6 +16,7 @@ from typing import Callable
 import websocket
 
 try:
+    from .assistant_service import run_assistant_turn
     from .faster_whisper_stt import TranscriptionResult, transcribe_audio_file
     from .session_control import (
         AudioSessionDirective,
@@ -24,6 +26,7 @@ try:
     )
     from .silero_vad_segmenter import FirstUtteranceDetector, SileroVadConfig, SpeechSegment
 except ImportError:
+    from assistant_service import run_assistant_turn
     from faster_whisper_stt import TranscriptionResult, transcribe_audio_file
     from session_control import (
         AudioSessionDirective,
@@ -268,6 +271,9 @@ class CaptureRequest:
     enable_first_utterance_vad: bool = True
     first_utterance_state: DeviceAudioSessionState = DeviceAudioSessionState.WAIT_WAKEWORD
     stop_after_first_utterance: bool | None = None
+    nfc_tag_id: str | None = None
+    user_id: str | None = None
+    device_id: str | None = None
 
     def websocket_url(self) -> str:
         path = self.ws_path if self.ws_path.startswith("/") else f"/{self.ws_path}"
@@ -297,6 +303,12 @@ class CaptureStatus:
     first_utterance_completion_reason: str | None = None
     first_utterance_transcript: str | None = None
     first_utterance_language: str | None = None
+    assistant_response_text: str | None = None
+    assistant_route_group: str | None = None
+    assistant_status: str | None = None
+    tts_asset_url: str | None = None
+    media_asset_url: str | None = None
+    device_command_count: int = 0
     device_state_signal: str | None = None
     device_state_signal_reason: str | None = None
     device_state_signal_sent_at: str | None = None
@@ -380,6 +392,31 @@ class CaptureSession:
 
         self._update_status(device_state_signal_sent_at=datetime.now(timezone.utc).isoformat())
 
+    def _send_json_message(self, ws: websocket.WebSocket, payload: dict[str, object]) -> None:
+        try:
+            ws.send(json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
+        except websocket.WebSocketException as exc:
+            raise FirstUtteranceProcessingError(
+                f"failed to send websocket payload '{payload.get('type', 'unknown')}': {exc}"
+            ) from exc
+
+    def _build_assistant_payload(self, transcription: TranscriptionResult) -> dict[str, object]:
+        return {
+            "user_id": self.request.user_id or "",
+            "nfc_tag_id": self.request.nfc_tag_id or "",
+            "device_id": self.request.device_id or self.request.ws_host,
+            "text_input": transcription.text,
+            "stt_text": transcription.text,
+        }
+
+    def _run_assistant_turn(self, transcription: TranscriptionResult) -> dict[str, object]:
+        try:
+            return run_assistant_turn(self._build_assistant_payload(transcription))
+        except Exception as exc:
+            raise FirstUtteranceProcessingError(
+                f"failed to process assistant turn: {exc}"
+            ) from exc
+
     def _send_return_to_wait_wakeword(
         self,
         ws: websocket.WebSocket,
@@ -397,17 +434,10 @@ class CaptureSession:
 
     def _handle_first_utterance(self, ws: websocket.WebSocket, segment: SpeechSegment) -> bool:
         detected_at = datetime.now(timezone.utc).isoformat()
-        should_roundtrip_through_thinking = (
-            self.request.first_utterance_state == DeviceAudioSessionState.THINKING
-        )
         directive = AudioSessionDirective(
             state=self.request.first_utterance_state,
             reason="first_utterance_detected",
-            # Keep the websocket alive during the thinking screen so the server
-            # can return the device to wait_wakeword after transcription finishes.
-            stop_capture=False
-            if should_roundtrip_through_thinking
-            else self.request.resolved_stop_after_first_utterance(),
+            stop_capture=False,
         )
 
         try:
@@ -432,7 +462,7 @@ class CaptureSession:
             time.sleep(DEFAULT_CONTROL_SIGNAL_SETTLE_SECONDS)
             transcription = self._transcribe_first_utterance(utterance_path)
         except FirstUtteranceProcessingError:
-            if should_roundtrip_through_thinking and initial_signal_sent:
+            if initial_signal_sent:
                 try:
                     self._send_return_to_wait_wakeword(ws, "first_utterance_processing_failed")
                 except FirstUtteranceProcessingError:
@@ -454,15 +484,66 @@ class CaptureSession:
             first_utterance_language=transcription.language,
         )
 
-        if should_roundtrip_through_thinking:
-            self._send_return_to_wait_wakeword(ws, "transcription_completed")
+        if not transcript_text:
+            self._send_return_to_wait_wakeword(ws, "empty_transcript")
             self._update_status(state="completed")
             return True
 
-        if directive.stop_capture:
-            self._update_status(state="completed")
+        try:
+            assistant_turn = self._run_assistant_turn(transcription)
+        except FirstUtteranceProcessingError:
+            if initial_signal_sent:
+                try:
+                    self._send_return_to_wait_wakeword(ws, "assistant_turn_failed")
+                except FirstUtteranceProcessingError:
+                    pass
+            raise
 
-        return directive.stop_capture
+        playback = assistant_turn.get("playback", {}) if isinstance(assistant_turn.get("playback"), dict) else {}
+        tts_playback = playback.get("tts", {}) if isinstance(playback.get("tts"), dict) else {}
+        media_playback = (
+            playback.get("media_after_tts", {})
+            if isinstance(playback.get("media_after_tts"), dict)
+            else {}
+        )
+        esp_messages = assistant_turn.get("esp_messages", [])
+        if not isinstance(esp_messages, list):
+            esp_messages = []
+        has_playback_message = any(
+            isinstance(message, dict) and message.get("type") == "assistant_playback"
+            for message in esp_messages
+        )
+
+        self._update_status(
+            assistant_response_text=str(assistant_turn.get("tts_text") or "") or None,
+            assistant_route_group=str(
+                ((assistant_turn.get("route") or {}) if isinstance(assistant_turn.get("route"), dict) else {}).get("group")
+                or ""
+            )
+            or None,
+            assistant_status=str(assistant_turn.get("status") or "") or None,
+            tts_asset_url=str(tts_playback.get("url") or "") or None,
+            media_asset_url=str(media_playback.get("stream_url") or "") or None,
+            device_command_count=len(
+                assistant_turn.get("commands_for_device", [])
+                if isinstance(assistant_turn.get("commands_for_device"), list)
+                else []
+            ),
+        )
+
+        if esp_messages:
+            for message in esp_messages:
+                if not isinstance(message, dict):
+                    continue
+                self._send_json_message(ws, message)
+                time.sleep(DEFAULT_CONTROL_SIGNAL_SETTLE_SECONDS)
+            if not has_playback_message:
+                self._send_return_to_wait_wakeword(ws, "assistant_commands_dispatched")
+        else:
+            self._send_return_to_wait_wakeword(ws, "assistant_response_without_playback")
+
+        self._update_status(state="completed")
+        return True
 
     def _run(self) -> None:
         while True:

@@ -19,3 +19,5 @@ include/secrets.h
 *.venv/
 
 *.wav
+*.mp3
+*.webm

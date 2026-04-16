@@ -79,7 +79,7 @@ cp server/database/.env.example server/database/.env
 Important fields:
 
 - `DATABASE_URL`: PostgreSQL connection string stored in `server/database/.env`
-- `GOOGLE_API_KEY`: required if you use the LLM pipeline
+- Backend / AI variables now live in `server/backend/.env`, not in `server/database/.env`
 
 ## Device Config
 

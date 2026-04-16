@@ -9,6 +9,7 @@ class DeviceAudioSessionState(str, Enum):
     WAIT_WAKEWORD = "wait_wakeword"
     STREAMING = "streaming"
     THINKING = "thinking"
+    SPEAKING = "speaking"
 
     @classmethod
     def from_value(cls, value: object) -> "DeviceAudioSessionState":
