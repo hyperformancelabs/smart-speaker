@@ -46,7 +46,7 @@
 #include "edge-impulse-sdk/classifier/inferencing_engines/engines.h"
 #include "edge-impulse-sdk/classifier/postprocessing/ei_postprocessing_common.h"
 
-const char* ei_classifier_inferencing_categories_950009_1[] = { "noise", "other", "wakeup" };
+const char* ei_classifier_inferencing_categories_950009_1[] = { "noise", "unknown", "wakeup" };
 
 ei_dsp_named_axis_t ei_dsp_config_950009_2_named_axes[] = {
     { .name = "Signal", .axis = 0 }
@@ -62,11 +62,11 @@ ei_dsp_config_mfcc_t ei_dsp_config_950009_2 = {
     ei_dsp_config_950009_2_named_axes_size, // size of the named axes array
     13, // int num_cepstral
     0.025f, // float frame_length
-    0.01f, // float frame_stride
+    0.02f, // float frame_stride
     32, // int num_filters
-    256, // int fft_length
-    51, // int win_size
-    100, // int low_frequency
+    512, // int fft_length
+    151, // int win_size
+    80, // int low_frequency
     8000, // int high_frequency
     0.97f, // float pre_cof
     1 // int pre_shift
@@ -76,7 +76,7 @@ const uint8_t ei_dsp_blocks_950009_1_size = 1;
 ei_model_dsp_t ei_dsp_blocks_950009_1[ei_dsp_blocks_950009_1_size] = {
     { // DSP block 2
         2,
-        1274, // output size
+        637, // output size
         &extract_mfcc_features, // DSP function pointer
         (void*)&ei_dsp_config_950009_2, // pointer to config struct
         ei_dsp_config_950009_2_axes, // array of offsets into the input stream, one for each axis
@@ -151,9 +151,9 @@ const ei_impulse_t impulse_950009_1 = {
     .project_name = "wakeup",
     .impulse_id = 1,
     .impulse_name = "Impulse #1",
-    .deploy_version = 4,
+    .deploy_version = 19,
 
-    .nn_input_frame_size = 1274,
+    .nn_input_frame_size = 637,
     .raw_sample_count = 16000,
     .raw_samples_per_frame = 1,
     .dsp_input_frame_size = 16000 * 1,
