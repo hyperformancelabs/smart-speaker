@@ -1,11 +1,13 @@
 #include "net/voice_backend_service.h"
 
 #include <cctype>
+#include <cstring>
 
 #include <esp_system.h>
 #include <HTTPClient.h>
 #include <WiFiClient.h>
 #include <WiFiClientSecure.h>
+#include <freertos/FreeRTOS.h>
 
 #include "app_config.h"
 #include "net/wifi_service.h"
@@ -22,6 +24,57 @@ constexpr uint16_t kVoiceBackendRequestTimeoutMs = 6500;
 constexpr unsigned long kVoiceBackendWifiReadyWaitMs = 1500;
 constexpr char kVoiceBackendPath[] = "/api/audio/start";
 constexpr char kFirstUtteranceState[] = "thinking";
+constexpr unsigned long kNoSpeechTimeoutSeconds = 10;
+portMUX_TYPE gCaptureTokenMux = portMUX_INITIALIZER_UNLOCKED;
+char gActiveCaptureToken[40] = {};
+
+void copyText(char dest[], size_t destSize, const String &src) {
+    if (destSize == 0) {
+        return;
+    }
+
+    const size_t copyLen = src.length() < (destSize - 1) ? src.length() : (destSize - 1);
+    memcpy(dest, src.c_str(), copyLen);
+    dest[copyLen] = '\0';
+}
+
+void setActiveCaptureToken(const String &token) {
+    taskENTER_CRITICAL(&gCaptureTokenMux);
+    copyText(gActiveCaptureToken, sizeof(gActiveCaptureToken), token);
+    taskEXIT_CRITICAL(&gCaptureTokenMux);
+}
+
+void clearActiveCaptureToken() {
+    taskENTER_CRITICAL(&gCaptureTokenMux);
+    gActiveCaptureToken[0] = '\0';
+    taskEXIT_CRITICAL(&gCaptureTokenMux);
+}
+
+String activeCaptureToken() {
+    char tokenCopy[sizeof(gActiveCaptureToken)] = {};
+    taskENTER_CRITICAL(&gCaptureTokenMux);
+    memcpy(tokenCopy, gActiveCaptureToken, sizeof(gActiveCaptureToken));
+    taskEXIT_CRITICAL(&gCaptureTokenMux);
+    return String(tokenCopy);
+}
+
+bool activeCaptureTokenEquals(const String &token) {
+    bool matches = false;
+    taskENTER_CRITICAL(&gCaptureTokenMux);
+    matches = gActiveCaptureToken[0] != '\0' && token == gActiveCaptureToken;
+    taskEXIT_CRITICAL(&gCaptureTokenMux);
+    return matches;
+}
+
+bool activeCaptureTokenMatches(const char *token) {
+    bool matches = false;
+    taskENTER_CRITICAL(&gCaptureTokenMux);
+    matches = (token == nullptr || token[0] == '\0')
+                  ? gActiveCaptureToken[0] == '\0'
+                  : (gActiveCaptureToken[0] != '\0' && strcmp(token, gActiveCaptureToken) == 0);
+    taskEXIT_CRITICAL(&gCaptureTokenMux);
+    return matches;
+}
 
 bool extractJsonStringField(const String &payload, const char *fieldName, String &value) {
     value = "";
@@ -76,10 +129,34 @@ bool parseExternalAudioSessionState(const String &value, ExternalAudioSessionSta
         return true;
     }
 
+    if (value.equalsIgnoreCase("speaking")) {
+        state = ExternalAudioSessionState::Speaking;
+        return true;
+    }
+
     return false;
 }
 
-String buildAudioStartPayload() {
+String buildCaptureToken() {
+    const uint32_t tokenPartA = static_cast<uint32_t>(esp_random());
+    const uint32_t tokenPartB = static_cast<uint32_t>(millis());
+    char buffer[32] = {};
+    snprintf(buffer, sizeof(buffer), "%08lx%08lx",
+             static_cast<unsigned long>(tokenPartA),
+             static_cast<unsigned long>(tokenPartB));
+    return String(buffer);
+}
+
+bool messageMatchesActiveCaptureToken(const String &message) {
+    String captureToken;
+    if (!extractJsonStringField(message, "capture_token", captureToken)) {
+        return activeCaptureTokenMatches(nullptr);
+    }
+
+    return activeCaptureTokenEquals(captureToken);
+}
+
+String buildAudioStartPayload(const String &captureToken) {
     const IPAddress ip = wifiGetIpAddress();
     if (ip == IPAddress()) {
         return "";
@@ -94,6 +171,12 @@ String buildAudioStartPayload() {
     payload += ",";
     payload += "\"first_utterance_state\":\"";
     payload += kFirstUtteranceState;
+    payload += "\",";
+    payload += "\"no_speech_timeout_seconds\":";
+    payload += String(kNoSpeechTimeoutSeconds);
+    payload += ",";
+    payload += "\"capture_token\":\"";
+    payload += captureToken;
     payload += "\"";
     payload += "}";
     return payload;
@@ -106,11 +189,14 @@ bool voiceBackendStartCapture() {
         return false;
     }
 
-    const String payload = buildAudioStartPayload();
+    const String nextCaptureToken = buildCaptureToken();
+    const String payload = buildAudioStartPayload(nextCaptureToken);
     if (payload.length() == 0) {
         Serial.println("voiceBackendStartCapture: missing local IP");
         return false;
     }
+
+    setActiveCaptureToken(nextCaptureToken);
 
     Serial.printf("voiceBackendStartCapture: free heap before request = %u bytes\n", ESP.getFreeHeap());
     const String url = String(DEVICE_VOICE_BACKEND_URL) + kVoiceBackendPath;
@@ -126,6 +212,7 @@ bool voiceBackendStartCapture() {
         http.setTimeout(kVoiceBackendRequestTimeoutMs);
         if (!http.begin(client, url)) {
             Serial.println("voiceBackendStartCapture: failed to begin request");
+            clearActiveCaptureToken();
             return false;
         }
 
@@ -140,6 +227,7 @@ bool voiceBackendStartCapture() {
                 Serial.printf("voiceBackendStartCapture failed: HTTP %d\n", code);
             }
             http.end();
+            clearActiveCaptureToken();
             return false;
         }
 
@@ -154,6 +242,7 @@ bool voiceBackendStartCapture() {
         http.setTimeout(kVoiceBackendRequestTimeoutMs);
         if (!http.begin(client, url)) {
             Serial.println("voiceBackendStartCapture: failed to begin request");
+            clearActiveCaptureToken();
             return false;
         }
 
@@ -168,6 +257,7 @@ bool voiceBackendStartCapture() {
                 Serial.printf("voiceBackendStartCapture failed: HTTP %d\n", code);
             }
             http.end();
+            clearActiveCaptureToken();
             return false;
         }
 
@@ -178,6 +268,14 @@ bool voiceBackendStartCapture() {
     }
 }
 
+void voiceBackendInvalidateCaptureToken() {
+    clearActiveCaptureToken();
+}
+
+bool voiceBackendCaptureTokenMatches(const char *captureToken) {
+    return activeCaptureTokenMatches(captureToken);
+}
+
 bool voiceBackendHandleControlMessage(const char *payload) {
     if (payload == nullptr || payload[0] == '\0') {
         return false;
@@ -185,26 +283,78 @@ bool voiceBackendHandleControlMessage(const char *payload) {
 
     const String message(payload);
     String messageType;
-    if (!extractJsonStringField(message, "type", messageType) ||
-        !messageType.equalsIgnoreCase("audio_session_state")) {
+    if (!extractJsonStringField(message, "type", messageType)) {
         return false;
     }
 
-    String stateValue;
-    if (!extractJsonStringField(message, "state", stateValue)) {
-        Serial.printf("voiceBackendHandleControlMessage: missing state in %s\n", message.c_str());
+    if (!messageMatchesActiveCaptureToken(message)) {
+        String messageCaptureToken;
+        extractJsonStringField(message, "capture_token", messageCaptureToken);
+        const String activeToken = activeCaptureToken();
+        Serial.printf(
+            "voiceBackendHandleControlMessage: ignored stale %s active_token=%s incoming_token=%s\n",
+            messageType.c_str(),
+            activeToken.length() > 0 ? activeToken.c_str() : "<none>",
+            messageCaptureToken.length() > 0 ? messageCaptureToken.c_str() : "<none>");
         return true;
     }
 
-    ExternalAudioSessionState nextState = ExternalAudioSessionState::WaitWakeword;
-    if (!parseExternalAudioSessionState(stateValue, nextState)) {
-        Serial.printf("voiceBackendHandleControlMessage: unsupported state '%s'\n",
-                      stateValue.c_str());
+    if (messageType.equalsIgnoreCase("audio_session_state")) {
+        String stateValue;
+        if (!extractJsonStringField(message, "state", stateValue)) {
+            Serial.printf("voiceBackendHandleControlMessage: missing state in %s\n", message.c_str());
+            return true;
+        }
+
+        ExternalAudioSessionState nextState = ExternalAudioSessionState::WaitWakeword;
+        if (!parseExternalAudioSessionState(stateValue, nextState)) {
+            Serial.printf("voiceBackendHandleControlMessage: unsupported state '%s'\n",
+                          stateValue.c_str());
+            return true;
+        }
+
+        appRequestExternalAudioSessionState(nextState);
+        Serial.printf("voiceBackendHandleControlMessage: queued state %s\n",
+                      appExternalAudioSessionStateName(nextState));
         return true;
     }
 
-    appRequestExternalAudioSessionState(nextState);
-    Serial.printf("voiceBackendHandleControlMessage: queued state %s\n",
-                  appExternalAudioSessionStateName(nextState));
-    return true;
+    if (messageType.equalsIgnoreCase("assistant_playback")) {
+        String ttsUrl;
+        String mediaUrl;
+        String mediaTitle;
+        String finalStateValue;
+
+        extractJsonStringField(message, "tts_url", ttsUrl);
+        extractJsonStringField(message, "media_url", mediaUrl);
+        extractJsonStringField(message, "media_title", mediaTitle);
+        extractJsonStringField(message, "final_state", finalStateValue);
+
+        AssistantPlaybackRequest request = {};
+        copyText(request.captureToken, sizeof(request.captureToken), activeCaptureToken());
+        copyText(request.ttsUrl, sizeof(request.ttsUrl), ttsUrl);
+        copyText(request.mediaUrl, sizeof(request.mediaUrl), mediaUrl);
+        copyText(request.mediaTitle, sizeof(request.mediaTitle), mediaTitle);
+
+        if (!finalStateValue.isEmpty()) {
+            parseExternalAudioSessionState(finalStateValue, request.finalState);
+        }
+
+        if (request.ttsUrl[0] == '\0' && request.mediaUrl[0] == '\0') {
+            appRequestExternalAudioSessionState(request.finalState);
+            Serial.printf(
+                "voiceBackendHandleControlMessage: playback message without URLs, switching to %s\n",
+                appExternalAudioSessionStateName(request.finalState));
+            return true;
+        }
+
+        appQueueAssistantPlayback(request);
+        appRequestExternalAudioSessionState(ExternalAudioSessionState::Speaking);
+        Serial.printf("voiceBackendHandleControlMessage: queued playback (tts=%s media=%s)\n",
+                      request.ttsUrl[0] != '\0' ? "yes" : "no",
+                      request.mediaUrl[0] != '\0' ? "yes" : "no");
+        return true;
+    }
+
+    return false;
 }

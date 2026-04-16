@@ -22,6 +22,7 @@ struct AudioChunk {
 
 struct AppState {
     AudioChunk latestAudio = {};
+    AudioChunk playbackAudio = {};
     char lastUid[32] = "(no card)";
     WakewordInfo wakeword = {};
 };

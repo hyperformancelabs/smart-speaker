@@ -44,6 +44,7 @@ class AudioSessionDirective:
     state: DeviceAudioSessionState
     reason: str
     stop_capture: bool
+    capture_token: str | None = None
 
 
 def build_audio_session_state_message(directive: AudioSessionDirective) -> str:
@@ -53,4 +54,6 @@ def build_audio_session_state_message(directive: AudioSessionDirective) -> str:
         "reason": directive.reason,
         "stop_capture": directive.stop_capture,
     }
+    if directive.capture_token:
+        payload["capture_token"] = directive.capture_token
     return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))

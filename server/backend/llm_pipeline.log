@@ -1,0 +1,399 @@
+2026-04-16 23:14:03 WARNING __main__: voice_backend_public_base_url_loopback | configured_base_url='http://localhost:8387' | guidance='ESP playback needs a LAN-reachable base URL; request host override will be used for live device sessions.'
+2026-04-16 23:14:03 INFO __main__: voice_backend_starting | port=8387 | configured_public_base_url='http://localhost:8387' | log_file=PosixPath('/Users/phatv/Documents/dev-local/smart-speaker/server/backend/llm_pipeline.log')
+2026-04-16 23:14:03 INFO werkzeug: [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8387
+ * Running on http://192.168.1.8:8387
+2026-04-16 23:14:03 INFO werkzeug: [33mPress CTRL+C to quit[0m
+2026-04-16 23:14:44 INFO __main__: audio_capture_start_requested | ws_host='192.168.1.9' | ws_port=81 | first_utterance_state='thinking' | no_speech_timeout_seconds=10.0 | public_base_url='http://192.168.1.8:8387' | configured_public_base_url='http://localhost:8387' | capture_token='9eb83943000037ae'
+2026-04-16 23:14:44 INFO werkzeug: 192.168.1.9 - - [16/Apr/2026 23:14:44] "[35m[1mPOST /api/audio/start HTTP/1.1[0m" 202 -
+2026-04-16 23:14:44 INFO audio_receiver: capture_connecting | session_id='20260416T161444920165Z' | ws_url='ws://192.168.1.9:81/' | capture_token='9eb83943000037ae' | public_base_url='http://192.168.1.8:8387'
+2026-04-16 23:14:45 INFO audio_receiver: capture_connected | session_id='20260416T161444920165Z' | ws_url='ws://192.168.1.9:81/' | capture_token='9eb83943000037ae'
+2026-04-16 23:14:45 INFO audio_receiver: capture_file_opened | path=PosixPath('/Users/phatv/Documents/dev-local/smart-speaker/server/backend/recordings/capture_20260416_231444_920602.wav')
+2026-04-16 23:14:59 INFO audio_receiver: capture_no_speech_timeout | session_id='20260416T161444920165Z' | timeout_seconds=10.0 | capture_token='9eb83943000037ae'
+2026-04-16 23:14:59 INFO audio_receiver: device_state_sending | session_id='20260416T161444920165Z' | ws_url='ws://192.168.1.9:81/' | state='wait_wakeword' | reason='no_speech_timeout' | stop_capture=True | capture_token='9eb83943000037ae'
+2026-04-16 23:14:59 INFO audio_receiver: capture_loop_finalized | session_id='20260416T161444920165Z' | state='completed' | total_frames=63360 | last_file_path='/Users/phatv/Documents/dev-local/smart-speaker/server/backend/recordings/capture_20260416_231444_920602.wav' | capture_token='9eb83943000037ae'
+2026-04-16 23:16:10 INFO __main__: audio_capture_start_requested | ws_host='192.168.1.9' | ws_port=81 | first_utterance_state='thinking' | no_speech_timeout_seconds=10.0 | public_base_url='http://192.168.1.8:8387' | configured_public_base_url='http://localhost:8387' | capture_token='ad661ed900018673'
+2026-04-16 23:16:10 INFO werkzeug: 192.168.1.9 - - [16/Apr/2026 23:16:10] "[35m[1mPOST /api/audio/start HTTP/1.1[0m" 202 -
+2026-04-16 23:16:10 INFO audio_receiver: capture_connecting | session_id='20260416T161610614392Z' | ws_url='ws://192.168.1.9:81/' | capture_token='ad661ed900018673' | public_base_url='http://192.168.1.8:8387'
+2026-04-16 23:16:10 INFO audio_receiver: capture_connected | session_id='20260416T161610614392Z' | ws_url='ws://192.168.1.9:81/' | capture_token='ad661ed900018673'
+2026-04-16 23:16:10 INFO audio_receiver: capture_file_opened | path=PosixPath('/Users/phatv/Documents/dev-local/smart-speaker/server/backend/recordings/capture_20260416_231610_614832.wav')
+2026-04-16 23:16:25 INFO audio_receiver: device_state_sending | session_id='20260416T161610614392Z' | ws_url='ws://192.168.1.9:81/' | state='thinking' | reason='first_utterance_detected' | stop_capture=False | capture_token='ad661ed900018673'
+2026-04-16 23:16:26 INFO httpx: HTTP Request: GET https://huggingface.co/api/models/Systran/faster-whisper-large-v3/revision/main "HTTP/1.1 200 OK"
+2026-04-16 23:16:32 INFO faster_whisper: Processing audio with duration 00:08.128
+2026-04-16 23:16:42 INFO faster_whisper: Detected language 'en' with probability 0.63
+2026-04-16 23:17:58 INFO audio_receiver: first_utterance_transcribed | session_id='20260416T161610614392Z' | capture_token='ad661ed900018673' | language='en' | transcript='wake up wake up wake up wake up wake up wake up'
+2026-04-16 23:17:58 INFO assistant_service: assistant_turn_started | device_id='192.168.1.9' | capture_token='ad661ed900018673' | public_base_url='http://192.168.1.8:8387' | text_input='wake up wake up wake up wake up wake up wake up'
+2026-04-16 23:17:58 INFO google_genai.models: AFC is enabled with max remote calls: 10.
+2026-04-16 23:18:01 INFO httpx: HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent "HTTP/1.1 200 OK"
+2026-04-16 23:18:01 INFO google_genai.models: AFC is enabled with max remote calls: 10.
+2026-04-16 23:18:13 INFO httpx: HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent "HTTP/1.1 200 OK"
+2026-04-16 23:18:13 INFO Vieneu.Turbo: ⏳ Downloading/Loading Turbo GGUF from: pnnbao-ump/VieNeu-TTS-v2-Turbo-GGUF...
+2026-04-16 23:18:14 INFO httpx: HTTP Request: HEAD https://huggingface.co/pnnbao-ump/VieNeu-TTS-v2-Turbo-GGUF/resolve/main/vieneu-tts-v2-turbo.gguf "HTTP/1.1 302 Found"
+2026-04-16 23:18:14 INFO Vieneu.Turbo: ✅ Turbo GGUF ready (GpuLayers: Metal)
+2026-04-16 23:18:14 INFO httpx: HTTP Request: HEAD https://huggingface.co/pnnbao-ump/VieNeu-Codec/resolve/main/vieneu_decoder.onnx "HTTP/1.1 302 Found"
+2026-04-16 23:18:14 INFO Vieneu.Turbo: Loading decoder ONNX on providers: ['CPUExecutionProvider']
+2026-04-16 23:18:15 INFO httpx: HTTP Request: HEAD https://huggingface.co/pnnbao-ump/VieNeu-Codec/resolve/main/vieneu_encoder.onnx "HTTP/1.1 302 Found"
+2026-04-16 23:18:15 INFO Vieneu.Turbo: Loading encoder ONNX on providers: ['CPUExecutionProvider']
+2026-04-16 23:18:15 INFO httpx: HTTP Request: HEAD https://huggingface.co/pnnbao-ump/VieNeu-TTS-v2-Turbo-GGUF/resolve/main/voices.json "HTTP/1.1 307 Temporary Redirect"
+2026-04-16 23:18:15 INFO httpx: HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/pnnbao-ump/VieNeu-TTS-v2-Turbo-GGUF/47c480ca9c79d75c5c839135ef0f2872d7d05cc0/voices.json "HTTP/1.1 200 OK"
+2026-04-16 23:18:15 INFO Vieneu: 📢 Loaded 4 voices from voices.json
+2026-04-16 23:18:17 INFO assistant_service: assistant_tts_ready | capture_token='ad661ed900018673' | asset_id='tts_e724911ae35a439f86b04dc063f81432' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_e724911ae35a439f86b04dc063f81432.wav' | spoken_text='Chào buổi tối Bạn gọi mình có việc gì không ạ'
+2026-04-16 23:18:17 INFO assistant_service: assistant_turn_completed | capture_token='ad661ed900018673' | assistant_status='conversation_active' | route_group='conversation' | has_tts=True | has_media=False | esp_message_count=2
+2026-04-16 23:18:17 INFO audio_receiver: assistant_turn_ready_for_device | session_id='20260416T161610614392Z' | capture_token='ad661ed900018673' | assistant_status='conversation_active' | route_group='conversation' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_e724911ae35a439f86b04dc063f81432.wav' | esp_message_count=2
+2026-04-16 23:18:17 INFO audio_receiver: device_payload_sending | session_id='20260416T161610614392Z' | ws_url='ws://192.168.1.9:81/' | payload_type='audio_session_state' | capture_token='ad661ed900018673'
+2026-04-16 23:18:17 INFO audio_receiver: device_payload_sending | session_id='20260416T161610614392Z' | ws_url='ws://192.168.1.9:81/' | payload_type='assistant_playback' | capture_token='ad661ed900018673' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_e724911ae35a439f86b04dc063f81432.wav' | final_state='streaming'
+2026-04-16 23:18:17 INFO werkzeug: 192.168.1.9 - - [16/Apr/2026 23:18:17] "GET /api/assets/tts/tts_e724911ae35a439f86b04dc063f81432.wav HTTP/1.1" 200 -
+2026-04-16 23:18:20 INFO audio_receiver: capture_loop_finalized | session_id='20260416T161610614392Z' | state='completed' | total_frames=248000 | last_file_path='/Users/phatv/Documents/dev-local/smart-speaker/server/backend/recordings/capture_20260416_231610_614832.wav' | capture_token='ad661ed900018673'
+2026-04-16 23:27:34 WARNING __main__: voice_backend_public_base_url_loopback | configured_base_url='http://localhost:8387' | guidance='ESP playback needs a LAN-reachable base URL; request host override will be used for live device sessions.'
+2026-04-16 23:27:34 INFO __main__: voice_backend_starting | port=8387 | configured_public_base_url='http://localhost:8387' | log_file=PosixPath('/Users/phatv/Documents/dev-local/smart-speaker/server/backend/llm_pipeline.log')
+2026-04-16 23:27:34 INFO werkzeug: [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8387
+ * Running on http://192.168.1.8:8387
+2026-04-16 23:27:34 INFO werkzeug: [33mPress CTRL+C to quit[0m
+2026-04-16 23:27:49 INFO __main__: audio_capture_start_requested | ws_host='192.168.1.9' | ws_port=81 | first_utterance_state='thinking' | no_speech_timeout_seconds=10.0 | public_base_url='http://192.168.1.8:8387' | configured_public_base_url='http://localhost:8387' | capture_token='28e418c40008b9f6'
+2026-04-16 23:27:49 INFO werkzeug: 192.168.1.9 - - [16/Apr/2026 23:27:49] "[35m[1mPOST /api/audio/start HTTP/1.1[0m" 202 -
+2026-04-16 23:27:49 INFO audio_receiver: capture_connecting | session_id='20260416T162749920824Z' | ws_url='ws://192.168.1.9:81/' | capture_token='28e418c40008b9f6' | public_base_url='http://192.168.1.8:8387'
+2026-04-16 23:27:50 INFO audio_receiver: capture_connected | session_id='20260416T162749920824Z' | ws_url='ws://192.168.1.9:81/' | capture_token='28e418c40008b9f6'
+2026-04-16 23:27:50 INFO audio_receiver: capture_file_opened | path=PosixPath('/Users/phatv/Documents/dev-local/smart-speaker/server/backend/recordings/capture_20260416_232749_921506.wav')
+2026-04-16 23:27:52 WARNING audio_receiver: capture_stream_stats | session_id='20260416T162749920824Z' | capture_token='28e418c40008b9f6' | interval_seconds=2.656 | packets=73 | audio_seconds=1.46 | realtime_ratio=0.55 | total_packets=73 | total_frames=23360
+2026-04-16 23:27:55 INFO audio_receiver: capture_pending_speech_flushed | session_id='20260416T162749920824Z' | capture_token='28e418c40008b9f6' | completion_reason='input_idle' | duration_seconds=2.016 | speech_blocks=17
+2026-04-16 23:27:55 INFO audio_receiver: device_state_sending | session_id='20260416T162749920824Z' | ws_url='ws://192.168.1.9:81/' | state='thinking' | reason='first_utterance_detected' | stop_capture=False | capture_token='28e418c40008b9f6'
+2026-04-16 23:27:56 INFO httpx: HTTP Request: GET https://huggingface.co/api/models/Systran/faster-whisper-large-v3/revision/main "HTTP/1.1 200 OK"
+2026-04-16 23:28:01 INFO faster_whisper: Processing audio with duration 00:02.016
+2026-04-16 23:28:07 INFO faster_whisper: Detected language 'vi' with probability 0.80
+2026-04-16 23:28:14 INFO audio_receiver: first_utterance_transcribed | session_id='20260416T162749920824Z' | capture_token='28e418c40008b9f6' | language='vi' | transcript='Chào bạn'
+2026-04-16 23:28:14 INFO assistant_service: assistant_turn_started | device_id='192.168.1.9' | capture_token='28e418c40008b9f6' | public_base_url='http://192.168.1.8:8387' | text_input='Chào bạn'
+2026-04-16 23:28:14 INFO google_genai.models: AFC is enabled with max remote calls: 10.
+2026-04-16 23:28:16 INFO httpx: HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent "HTTP/1.1 200 OK"
+2026-04-16 23:28:16 INFO google_genai.models: AFC is enabled with max remote calls: 10.
+2026-04-16 23:28:19 INFO httpx: HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent "HTTP/1.1 200 OK"
+2026-04-16 23:28:19 INFO Vieneu.Turbo: ⏳ Downloading/Loading Turbo GGUF from: pnnbao-ump/VieNeu-TTS-v2-Turbo-GGUF...
+2026-04-16 23:28:20 INFO httpx: HTTP Request: HEAD https://huggingface.co/pnnbao-ump/VieNeu-TTS-v2-Turbo-GGUF/resolve/main/vieneu-tts-v2-turbo.gguf "HTTP/1.1 302 Found"
+2026-04-16 23:28:20 INFO Vieneu.Turbo: ✅ Turbo GGUF ready (GpuLayers: Metal)
+2026-04-16 23:28:20 INFO httpx: HTTP Request: HEAD https://huggingface.co/pnnbao-ump/VieNeu-Codec/resolve/main/vieneu_decoder.onnx "HTTP/1.1 302 Found"
+2026-04-16 23:28:20 INFO Vieneu.Turbo: Loading decoder ONNX on providers: ['CPUExecutionProvider']
+2026-04-16 23:28:21 INFO httpx: HTTP Request: HEAD https://huggingface.co/pnnbao-ump/VieNeu-Codec/resolve/main/vieneu_encoder.onnx "HTTP/1.1 302 Found"
+2026-04-16 23:28:21 INFO Vieneu.Turbo: Loading encoder ONNX on providers: ['CPUExecutionProvider']
+2026-04-16 23:28:22 INFO httpx: HTTP Request: HEAD https://huggingface.co/pnnbao-ump/VieNeu-TTS-v2-Turbo-GGUF/resolve/main/voices.json "HTTP/1.1 307 Temporary Redirect"
+2026-04-16 23:28:22 INFO httpx: HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/pnnbao-ump/VieNeu-TTS-v2-Turbo-GGUF/47c480ca9c79d75c5c839135ef0f2872d7d05cc0/voices.json "HTTP/1.1 200 OK"
+2026-04-16 23:28:22 INFO Vieneu: 📢 Loaded 4 voices from voices.json
+2026-04-16 23:28:23 INFO assistant_service: assistant_tts_ready | capture_token='28e418c40008b9f6' | asset_id='tts_0a8ba504ae924a0e8bcd607a10826b33' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_0a8ba504ae924a0e8bcd607a10826b33.wav' | spoken_text='Chào bạn Rất vui được trò chuyện với bạn Bạn có khỏe không'
+2026-04-16 23:28:23 INFO assistant_service: assistant_turn_completed | capture_token='28e418c40008b9f6' | assistant_status='conversation_active' | route_group='conversation' | has_tts=True | has_media=False | esp_message_count=2
+2026-04-16 23:28:23 INFO audio_receiver: assistant_turn_ready_for_device | session_id='20260416T162749920824Z' | capture_token='28e418c40008b9f6' | assistant_status='conversation_active' | route_group='conversation' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_0a8ba504ae924a0e8bcd607a10826b33.wav' | esp_message_count=2
+2026-04-16 23:28:23 INFO audio_receiver: device_payload_sending | session_id='20260416T162749920824Z' | ws_url='ws://192.168.1.9:81/' | payload_type='audio_session_state' | capture_token='28e418c40008b9f6'
+2026-04-16 23:28:24 INFO audio_receiver: device_payload_sending | session_id='20260416T162749920824Z' | ws_url='ws://192.168.1.9:81/' | payload_type='assistant_playback' | capture_token='28e418c40008b9f6' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_0a8ba504ae924a0e8bcd607a10826b33.wav' | final_state='streaming'
+2026-04-16 23:28:24 INFO werkzeug: 192.168.1.9 - - [16/Apr/2026 23:28:24] "GET /api/assets/tts/tts_0a8ba504ae924a0e8bcd607a10826b33.wav HTTP/1.1" 200 -
+2026-04-16 23:28:27 INFO audio_receiver: capture_loop_finalized | session_id='20260416T162749920824Z' | state='completed' | total_frames=32640 | last_file_path='/Users/phatv/Documents/dev-local/smart-speaker/server/backend/recordings/capture_20260416_232749_921506.wav' | capture_token='28e418c40008b9f6'
+2026-04-16 23:41:15 INFO __main__: audio_capture_start_requested | ws_host='192.168.1.9' | ws_port=81 | first_utterance_state='thinking' | no_speech_timeout_seconds=10.0 | public_base_url='http://192.168.1.8:8387' | configured_public_base_url='http://localhost:8387' | capture_token='ff750bd00000312d'
+2026-04-16 23:41:15 INFO werkzeug: 192.168.1.9 - - [16/Apr/2026 23:41:15] "[35m[1mPOST /api/audio/start HTTP/1.1[0m" 202 -
+2026-04-16 23:41:15 INFO audio_receiver: capture_connecting | session_id='20260416T164115183434Z' | ws_url='ws://192.168.1.9:81/' | capture_token='ff750bd00000312d' | public_base_url='http://192.168.1.8:8387'
+2026-04-16 23:41:16 INFO audio_receiver: capture_connected | session_id='20260416T164115183434Z' | ws_url='ws://192.168.1.9:81/' | capture_token='ff750bd00000312d'
+2026-04-16 23:41:16 INFO audio_receiver: capture_file_opened | path=PosixPath('/Users/phatv/Documents/dev-local/smart-speaker/server/backend/recordings/capture_20260416_234115_184316.wav')
+2026-04-16 23:41:18 WARNING audio_receiver: capture_stream_stats | session_id='20260416T164115183434Z' | capture_token='ff750bd00000312d' | interval_seconds=3.08 | packets=25 | audio_seconds=0.5 | realtime_ratio=0.162 | total_packets=25 | total_frames=8000
+2026-04-16 23:41:19 INFO audio_receiver: device_state_sending | session_id='20260416T164115183434Z' | ws_url='ws://192.168.1.9:81/' | state='thinking' | reason='first_utterance_detected' | stop_capture=False | capture_token='ff750bd00000312d'
+2026-04-16 23:41:19 INFO faster_whisper: Processing audio with duration 00:02.304
+2026-04-16 23:41:28 INFO faster_whisper: Detected language 'en' with probability 0.79
+2026-04-16 23:41:35 INFO audio_receiver: first_utterance_transcribed | session_id='20260416T164115183434Z' | capture_token='ff750bd00000312d' | language='en' | transcript='All right.'
+2026-04-16 23:41:35 INFO assistant_service: assistant_turn_started | device_id='192.168.1.9' | capture_token='ff750bd00000312d' | public_base_url='http://192.168.1.8:8387' | text_input='All right.'
+2026-04-16 23:41:35 INFO google_genai.models: AFC is enabled with max remote calls: 10.
+2026-04-16 23:41:38 INFO httpx: HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent "HTTP/1.1 200 OK"
+2026-04-16 23:41:38 INFO google_genai.models: AFC is enabled with max remote calls: 10.
+2026-04-16 23:41:41 INFO httpx: HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent "HTTP/1.1 200 OK"
+2026-04-16 23:41:42 INFO assistant_service: assistant_tts_ready | capture_token='ff750bd00000312d' | asset_id='tts_8d1c57ac3da34fb298cd563091db6b4d' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_8d1c57ac3da34fb298cd563091db6b4d.wav' | spoken_text='Tuyệt vời Bạn có muốn chia sẻ điều gì với mình không'
+2026-04-16 23:41:42 INFO assistant_service: assistant_turn_completed | capture_token='ff750bd00000312d' | assistant_status='conversation_active' | route_group='conversation' | has_tts=True | has_media=False | esp_message_count=2
+2026-04-16 23:41:42 INFO audio_receiver: assistant_turn_ready_for_device | session_id='20260416T164115183434Z' | capture_token='ff750bd00000312d' | assistant_status='conversation_active' | route_group='conversation' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_8d1c57ac3da34fb298cd563091db6b4d.wav' | esp_message_count=2
+2026-04-16 23:41:42 INFO audio_receiver: device_payload_sending | session_id='20260416T164115183434Z' | ws_url='ws://192.168.1.9:81/' | payload_type='audio_session_state' | capture_token='ff750bd00000312d'
+2026-04-16 23:41:42 INFO audio_receiver: device_payload_sending | session_id='20260416T164115183434Z' | ws_url='ws://192.168.1.9:81/' | payload_type='assistant_playback' | capture_token='ff750bd00000312d' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_8d1c57ac3da34fb298cd563091db6b4d.wav' | final_state='streaming'
+2026-04-16 23:41:42 INFO werkzeug: 192.168.1.9 - - [16/Apr/2026 23:41:42] "GET /api/assets/tts/tts_8d1c57ac3da34fb298cd563091db6b4d.wav HTTP/1.1" 200 -
+2026-04-16 23:41:45 INFO audio_receiver: capture_loop_finalized | session_id='20260416T164115183434Z' | state='completed' | total_frames=44800 | last_file_path='/Users/phatv/Documents/dev-local/smart-speaker/server/backend/recordings/capture_20260416_234115_184316.wav' | capture_token='ff750bd00000312d'
+2026-04-16 23:52:32 INFO __main__: audio_capture_start_requested | ws_host='192.168.1.9' | ws_port=81 | first_utterance_state='thinking' | no_speech_timeout_seconds=10.0 | public_base_url='http://192.168.1.8:8387' | configured_public_base_url='http://localhost:8387' | capture_token='cd66a60c00037570'
+2026-04-16 23:52:32 INFO werkzeug: 192.168.1.9 - - [16/Apr/2026 23:52:32] "[35m[1mPOST /api/audio/start HTTP/1.1[0m" 202 -
+2026-04-16 23:52:32 INFO audio_receiver: capture_connecting | session_id='20260416T165232242590Z' | ws_url='ws://192.168.1.9:81/' | capture_token='cd66a60c00037570' | public_base_url='http://192.168.1.8:8387'
+2026-04-16 23:52:32 INFO audio_receiver: capture_connected | session_id='20260416T165232242590Z' | ws_url='ws://192.168.1.9:81/' | capture_token='cd66a60c00037570'
+2026-04-16 23:52:32 INFO audio_receiver: capture_file_opened | path=PosixPath('/Users/phatv/Documents/dev-local/smart-speaker/server/backend/recordings/capture_20260416_235232_243548.wav')
+2026-04-16 23:52:35 INFO audio_receiver: capture_pending_speech_flushed | session_id='20260416T165232242590Z' | capture_token='cd66a60c00037570' | completion_reason='input_idle' | duration_seconds=1.152 | speech_blocks=12
+2026-04-16 23:52:35 INFO audio_receiver: device_state_sending | session_id='20260416T165232242590Z' | ws_url='ws://192.168.1.9:81/' | state='thinking' | reason='first_utterance_detected' | stop_capture=False | capture_token='cd66a60c00037570'
+2026-04-16 23:52:35 INFO faster_whisper: Processing audio with duration 00:01.152
+2026-04-16 23:52:42 INFO faster_whisper: Detected language 'vi' with probability 0.19
+2026-04-16 23:52:49 INFO audio_receiver: first_utterance_transcribed | session_id='20260416T165232242590Z' | capture_token='cd66a60c00037570' | language='vi' | transcript='Chào bạn'
+2026-04-16 23:52:49 INFO assistant_service: assistant_turn_started | device_id='192.168.1.9' | capture_token='cd66a60c00037570' | public_base_url='http://192.168.1.8:8387' | text_input='Chào bạn'
+2026-04-16 23:52:49 INFO google_genai.models: AFC is enabled with max remote calls: 10.
+2026-04-16 23:52:53 INFO httpx: HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent "HTTP/1.1 200 OK"
+2026-04-16 23:52:53 INFO google_genai.models: AFC is enabled with max remote calls: 10.
+2026-04-16 23:52:56 INFO httpx: HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent "HTTP/1.1 200 OK"
+2026-04-16 23:52:57 INFO assistant_service: assistant_tts_ready | capture_token='cd66a60c00037570' | asset_id='tts_95454728105b4e80a6166b9df64f5182' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_95454728105b4e80a6166b9df64f5182.wav' | spoken_text='Chào bạn Mình rất vui được gặp lại bạn Hôm nay bạn có gì vui không'
+2026-04-16 23:52:57 INFO assistant_service: assistant_turn_completed | capture_token='cd66a60c00037570' | assistant_status='conversation_active' | route_group='conversation' | has_tts=True | has_media=False | esp_message_count=2
+2026-04-16 23:52:57 INFO audio_receiver: assistant_turn_ready_for_device | session_id='20260416T165232242590Z' | capture_token='cd66a60c00037570' | assistant_status='conversation_active' | route_group='conversation' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_95454728105b4e80a6166b9df64f5182.wav' | esp_message_count=2
+2026-04-16 23:52:57 INFO audio_receiver: device_payload_sending | session_id='20260416T165232242590Z' | ws_url='ws://192.168.1.9:81/' | payload_type='audio_session_state' | capture_token='cd66a60c00037570'
+2026-04-16 23:52:57 INFO audio_receiver: device_payload_sending | session_id='20260416T165232242590Z' | ws_url='ws://192.168.1.9:81/' | payload_type='assistant_playback' | capture_token='cd66a60c00037570' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_95454728105b4e80a6166b9df64f5182.wav' | final_state='streaming'
+2026-04-16 23:53:00 INFO audio_receiver: capture_loop_finalized | session_id='20260416T165232242590Z' | state='completed' | total_frames=18880 | last_file_path='/Users/phatv/Documents/dev-local/smart-speaker/server/backend/recordings/capture_20260416_235232_243548.wav' | capture_token='cd66a60c00037570'
+2026-04-17 00:07:05 WARNING __main__: voice_backend_public_base_url_loopback | configured_base_url='http://localhost:8387' | guidance='ESP playback needs a LAN-reachable base URL; request host override will be used for live device sessions.'
+2026-04-17 00:07:05 INFO __main__: voice_backend_starting | port=8387 | configured_public_base_url='http://localhost:8387' | log_file=PosixPath('/Users/phatv/Documents/dev-local/smart-speaker/server/backend/llm_pipeline.log')
+2026-04-17 00:07:05 INFO werkzeug: [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8387
+ * Running on http://192.168.1.8:8387
+2026-04-17 00:07:05 INFO werkzeug: [33mPress CTRL+C to quit[0m
+2026-04-17 00:08:48 INFO __main__: audio_capture_start_requested | ws_host='192.168.1.9' | ws_port=81 | first_utterance_state='thinking' | no_speech_timeout_seconds=10.0 | public_base_url='http://192.168.1.8:8387' | configured_public_base_url='http://localhost:8387' | capture_token='c099759d00012ac6'
+2026-04-17 00:08:48 INFO werkzeug: 192.168.1.9 - - [17/Apr/2026 00:08:48] "[35m[1mPOST /api/audio/start HTTP/1.1[0m" 202 -
+2026-04-17 00:08:48 INFO audio_receiver: capture_connecting | session_id='20260416T170848733980Z' | ws_url='ws://192.168.1.9:81/' | capture_token='c099759d00012ac6' | public_base_url='http://192.168.1.8:8387'
+2026-04-17 00:08:48 INFO audio_receiver: capture_connected | session_id='20260416T170848733980Z' | ws_url='ws://192.168.1.9:81/' | capture_token='c099759d00012ac6'
+2026-04-17 00:08:48 INFO audio_receiver: capture_file_opened | path=PosixPath('/Users/phatv/Documents/dev-local/smart-speaker/server/backend/recordings/capture_20260417_000848_734880.wav')
+2026-04-17 00:08:50 WARNING audio_receiver: capture_stream_stats | session_id='20260416T170848733980Z' | capture_token='c099759d00012ac6' | interval_seconds=2.002 | packets=61 | audio_seconds=1.22 | realtime_ratio=0.609 | total_packets=61 | total_frames=19520
+2026-04-17 00:08:52 INFO audio_receiver: capture_stream_stats | session_id='20260416T170848733980Z' | capture_token='c099759d00012ac6' | interval_seconds=2.033 | packets=153 | audio_seconds=3.06 | realtime_ratio=1.505 | total_packets=214 | total_frames=68480
+2026-04-17 00:08:53 INFO audio_receiver: device_state_sending | session_id='20260416T170848733980Z' | ws_url='ws://192.168.1.9:81/' | state='thinking' | reason='first_utterance_detected' | stop_capture=False | capture_token='c099759d00012ac6'
+2026-04-17 00:08:54 INFO httpx: HTTP Request: GET https://huggingface.co/api/models/Systran/faster-whisper-large-v3/revision/main "HTTP/1.1 200 OK"
+2026-04-17 00:09:00 INFO faster_whisper: Processing audio with duration 00:02.080
+2026-04-17 00:09:06 INFO faster_whisper: Detected language 'vi' with probability 0.58
+2026-04-17 00:09:14 INFO audio_receiver: first_utterance_transcribed | session_id='20260416T170848733980Z' | capture_token='c099759d00012ac6' | language='vi' | transcript='Chào bạn'
+2026-04-17 00:09:14 INFO assistant_service: assistant_turn_started | device_id='192.168.1.9' | capture_token='c099759d00012ac6' | public_base_url='http://192.168.1.8:8387' | text_input='Chào bạn'
+2026-04-17 00:09:14 INFO google_genai.models: AFC is enabled with max remote calls: 10.
+2026-04-17 00:09:16 INFO httpx: HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent "HTTP/1.1 200 OK"
+2026-04-17 00:09:16 INFO google_genai.models: AFC is enabled with max remote calls: 10.
+2026-04-17 00:09:19 INFO httpx: HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent "HTTP/1.1 200 OK"
+2026-04-17 00:09:19 INFO Vieneu.Turbo: ⏳ Downloading/Loading Turbo GGUF from: pnnbao-ump/VieNeu-TTS-v2-Turbo-GGUF...
+2026-04-17 00:09:19 INFO httpx: HTTP Request: HEAD https://huggingface.co/pnnbao-ump/VieNeu-TTS-v2-Turbo-GGUF/resolve/main/vieneu-tts-v2-turbo.gguf "HTTP/1.1 302 Found"
+2026-04-17 00:09:20 INFO Vieneu.Turbo: ✅ Turbo GGUF ready (GpuLayers: Metal)
+2026-04-17 00:09:20 INFO httpx: HTTP Request: HEAD https://huggingface.co/pnnbao-ump/VieNeu-Codec/resolve/main/vieneu_decoder.onnx "HTTP/1.1 302 Found"
+2026-04-17 00:09:20 INFO Vieneu.Turbo: Loading decoder ONNX on providers: ['CPUExecutionProvider']
+2026-04-17 00:09:21 INFO httpx: HTTP Request: HEAD https://huggingface.co/pnnbao-ump/VieNeu-Codec/resolve/main/vieneu_encoder.onnx "HTTP/1.1 302 Found"
+2026-04-17 00:09:21 INFO Vieneu.Turbo: Loading encoder ONNX on providers: ['CPUExecutionProvider']
+2026-04-17 00:09:21 INFO httpx: HTTP Request: HEAD https://huggingface.co/pnnbao-ump/VieNeu-TTS-v2-Turbo-GGUF/resolve/main/voices.json "HTTP/1.1 307 Temporary Redirect"
+2026-04-17 00:09:21 INFO httpx: HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/pnnbao-ump/VieNeu-TTS-v2-Turbo-GGUF/47c480ca9c79d75c5c839135ef0f2872d7d05cc0/voices.json "HTTP/1.1 200 OK"
+2026-04-17 00:09:21 INFO Vieneu: 📢 Loaded 4 voices from voices.json
+2026-04-17 00:09:23 INFO assistant_service: assistant_tts_ready | capture_token='c099759d00012ac6' | asset_id='tts_c6d75420cdcc4ffeb7ff40e22477f745' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_c6d75420cdcc4ffeb7ff40e22477f745.wav' | spoken_text='Chào bạn Rất vui được trò chuyện với bạn Bạn có khỏe không'
+2026-04-17 00:09:23 INFO assistant_service: assistant_turn_completed | capture_token='c099759d00012ac6' | assistant_status='conversation_active' | route_group='conversation' | has_tts=True | has_media=False | esp_message_count=2
+2026-04-17 00:09:23 INFO audio_receiver: assistant_turn_ready_for_device | session_id='20260416T170848733980Z' | capture_token='c099759d00012ac6' | assistant_status='conversation_active' | route_group='conversation' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_c6d75420cdcc4ffeb7ff40e22477f745.wav' | esp_message_count=2
+2026-04-17 00:09:23 INFO audio_receiver: device_payload_sending | session_id='20260416T170848733980Z' | ws_url='ws://192.168.1.9:81/' | payload_type='audio_session_state' | capture_token='c099759d00012ac6'
+2026-04-17 00:09:23 INFO audio_receiver: device_payload_sending | session_id='20260416T170848733980Z' | ws_url='ws://192.168.1.9:81/' | payload_type='assistant_playback' | capture_token='c099759d00012ac6' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_c6d75420cdcc4ffeb7ff40e22477f745.wav' | final_state='streaming'
+2026-04-17 00:09:23 INFO werkzeug: 192.168.1.9 - - [17/Apr/2026 00:09:23] "GET /api/assets/tts/tts_c6d75420cdcc4ffeb7ff40e22477f745.wav HTTP/1.1" 200 -
+2026-04-17 00:09:26 INFO audio_receiver: capture_loop_finalized | session_id='20260416T170848733980Z' | state='completed' | total_frames=75520 | last_file_path='/Users/phatv/Documents/dev-local/smart-speaker/server/backend/recordings/capture_20260417_000848_734880.wav' | capture_token='c099759d00012ac6'
+2026-04-17 00:09:43 INFO __main__: audio_capture_start_requested | ws_host='192.168.1.9' | ws_port=81 | first_utterance_state='thinking' | no_speech_timeout_seconds=10.0 | public_base_url='http://192.168.1.8:8387' | configured_public_base_url='http://localhost:8387' | capture_token='e4941dbc0002024b'
+2026-04-17 00:09:43 INFO audio_receiver: capture_connecting | session_id='20260416T170943175299Z' | ws_url='ws://192.168.1.9:81/' | capture_token='e4941dbc0002024b' | public_base_url='http://192.168.1.8:8387'
+2026-04-17 00:09:43 INFO werkzeug: 192.168.1.9 - - [17/Apr/2026 00:09:43] "[35m[1mPOST /api/audio/start HTTP/1.1[0m" 202 -
+2026-04-17 00:09:43 INFO audio_receiver: capture_connected | session_id='20260416T170943175299Z' | ws_url='ws://192.168.1.9:81/' | capture_token='e4941dbc0002024b'
+2026-04-17 00:09:43 INFO audio_receiver: capture_file_opened | path=PosixPath('/Users/phatv/Documents/dev-local/smart-speaker/server/backend/recordings/capture_20260417_000943_175504.wav')
+2026-04-17 00:09:53 INFO audio_receiver: capture_no_speech_timeout | session_id='20260416T170943175299Z' | timeout_seconds=10.0 | capture_token='e4941dbc0002024b'
+2026-04-17 00:09:53 INFO audio_receiver: device_state_sending | session_id='20260416T170943175299Z' | ws_url='ws://192.168.1.9:81/' | state='wait_wakeword' | reason='no_speech_timeout' | stop_capture=True | capture_token='e4941dbc0002024b'
+2026-04-17 00:09:56 INFO audio_receiver: capture_loop_finalized | session_id='20260416T170943175299Z' | state='completed' | total_frames=10880 | last_file_path='/Users/phatv/Documents/dev-local/smart-speaker/server/backend/recordings/capture_20260417_000943_175504.wav' | capture_token='e4941dbc0002024b'
+2026-04-17 00:20:59 INFO __main__: audio_capture_start_requested | ws_host='192.168.1.9' | ws_port=81 | first_utterance_state='thinking' | no_speech_timeout_seconds=10.0 | public_base_url='http://192.168.1.8:8387' | configured_public_base_url='http://localhost:8387' | capture_token='45108793000099fe'
+2026-04-17 00:20:59 INFO werkzeug: 192.168.1.9 - - [17/Apr/2026 00:20:59] "[35m[1mPOST /api/audio/start HTTP/1.1[0m" 202 -
+2026-04-17 00:20:59 INFO audio_receiver: capture_connecting | session_id='20260416T172059227106Z' | ws_url='ws://192.168.1.9:81/' | capture_token='45108793000099fe' | public_base_url='http://192.168.1.8:8387'
+2026-04-17 00:20:59 INFO audio_receiver: capture_connected | session_id='20260416T172059227106Z' | ws_url='ws://192.168.1.9:81/' | capture_token='45108793000099fe'
+2026-04-17 00:20:59 INFO audio_receiver: capture_file_opened | path=PosixPath('/Users/phatv/Documents/dev-local/smart-speaker/server/backend/recordings/capture_20260417_002059_230233.wav')
+2026-04-17 00:21:01 INFO audio_receiver: capture_stream_stats | session_id='20260416T172059227106Z' | capture_token='45108793000099fe' | interval_seconds=2.022 | packets=95 | audio_seconds=1.9 | realtime_ratio=0.94 | total_packets=95 | total_frames=30400
+2026-04-17 00:21:02 INFO audio_receiver: device_state_sending | session_id='20260416T172059227106Z' | ws_url='ws://192.168.1.9:81/' | state='thinking' | reason='first_utterance_detected' | stop_capture=False | capture_token='45108793000099fe'
+2026-04-17 00:21:02 INFO faster_whisper: Processing audio with duration 00:02.080
+2026-04-17 00:21:10 INFO faster_whisper: Detected language 'vi' with probability 0.69
+2026-04-17 00:21:17 INFO audio_receiver: first_utterance_transcribed | session_id='20260416T172059227106Z' | capture_token='45108793000099fe' | language='vi' | transcript='Chào bạn'
+2026-04-17 00:21:17 INFO assistant_service: assistant_turn_started | device_id='192.168.1.9' | capture_token='45108793000099fe' | public_base_url='http://192.168.1.8:8387' | text_input='Chào bạn'
+2026-04-17 00:21:17 INFO google_genai.models: AFC is enabled with max remote calls: 10.
+2026-04-17 00:21:19 INFO httpx: HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent "HTTP/1.1 200 OK"
+2026-04-17 00:21:19 INFO google_genai.models: AFC is enabled with max remote calls: 10.
+2026-04-17 00:21:22 INFO httpx: HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent "HTTP/1.1 200 OK"
+2026-04-17 00:21:24 INFO assistant_service: assistant_tts_ready | capture_token='45108793000099fe' | asset_id='tts_23bb019ac6f6467699951a7f40cba3fc' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_23bb019ac6f6467699951a7f40cba3fc.wav' | spoken_text='Chào bạn Mình rất vui được gặp bạn Hôm nay bạn có gì vui không'
+2026-04-17 00:21:24 INFO assistant_service: assistant_turn_completed | capture_token='45108793000099fe' | assistant_status='conversation_active' | route_group='conversation' | has_tts=True | has_media=False | esp_message_count=2
+2026-04-17 00:21:24 INFO audio_receiver: assistant_turn_ready_for_device | session_id='20260416T172059227106Z' | capture_token='45108793000099fe' | assistant_status='conversation_active' | route_group='conversation' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_23bb019ac6f6467699951a7f40cba3fc.wav' | esp_message_count=2
+2026-04-17 00:21:24 INFO audio_receiver: device_payload_sending | session_id='20260416T172059227106Z' | ws_url='ws://192.168.1.9:81/' | payload_type='audio_session_state' | capture_token='45108793000099fe'
+2026-04-17 00:21:24 INFO audio_receiver: device_payload_sending | session_id='20260416T172059227106Z' | ws_url='ws://192.168.1.9:81/' | payload_type='assistant_playback' | capture_token='45108793000099fe' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_23bb019ac6f6467699951a7f40cba3fc.wav' | final_state='streaming'
+2026-04-17 00:21:24 INFO werkzeug: 192.168.1.9 - - [17/Apr/2026 00:21:24] "GET /api/assets/tts/tts_23bb019ac6f6467699951a7f40cba3fc.wav HTTP/1.1" 200 -
+2026-04-17 00:21:27 INFO audio_receiver: capture_loop_finalized | session_id='20260416T172059227106Z' | state='completed' | total_frames=50880 | last_file_path='/Users/phatv/Documents/dev-local/smart-speaker/server/backend/recordings/capture_20260417_002059_230233.wav' | capture_token='45108793000099fe'
+2026-04-17 00:21:27 INFO __main__: audio_capture_start_requested | ws_host='192.168.1.9' | ws_port=81 | first_utterance_state='thinking' | no_speech_timeout_seconds=10.0 | public_base_url='http://192.168.1.8:8387' | configured_public_base_url='http://localhost:8387' | capture_token='bf519ebb00010a1e'
+2026-04-17 00:21:27 INFO werkzeug: 192.168.1.9 - - [17/Apr/2026 00:21:27] "[35m[1mPOST /api/audio/start HTTP/1.1[0m" 202 -
+2026-04-17 00:21:27 INFO audio_receiver: capture_connecting | session_id='20260416T172127933951Z' | ws_url='ws://192.168.1.9:81/' | capture_token='bf519ebb00010a1e' | public_base_url='http://192.168.1.8:8387'
+2026-04-17 00:21:28 INFO audio_receiver: capture_connected | session_id='20260416T172127933951Z' | ws_url='ws://192.168.1.9:81/' | capture_token='bf519ebb00010a1e'
+2026-04-17 00:21:28 INFO audio_receiver: capture_file_opened | path=PosixPath('/Users/phatv/Documents/dev-local/smart-speaker/server/backend/recordings/capture_20260417_002127_934451.wav')
+2026-04-17 00:21:29 INFO audio_receiver: capture_stream_stats | session_id='20260416T172127933951Z' | capture_token='bf519ebb00010a1e' | interval_seconds=2.001 | packets=93 | audio_seconds=1.86 | realtime_ratio=0.929 | total_packets=93 | total_frames=29760
+2026-04-17 00:21:31 WARNING audio_receiver: capture_stream_stats | session_id='20260416T172127933951Z' | capture_token='bf519ebb00010a1e' | interval_seconds=2.01 | packets=55 | audio_seconds=1.1 | realtime_ratio=0.547 | total_packets=148 | total_frames=47360
+2026-04-17 00:21:32 INFO audio_receiver: device_state_sending | session_id='20260416T172127933951Z' | ws_url='ws://192.168.1.9:81/' | state='thinking' | reason='first_utterance_detected' | stop_capture=False | capture_token='bf519ebb00010a1e'
+2026-04-17 00:21:32 INFO faster_whisper: Processing audio with duration 00:01.120
+2026-04-17 00:21:38 INFO faster_whisper: Detected language 'en' with probability 0.57
+2026-04-17 00:21:46 INFO audio_receiver: first_utterance_transcribed | session_id='20260416T172127933951Z' | capture_token='bf519ebb00010a1e' | language='en' | transcript='Put your head.'
+2026-04-17 00:21:46 INFO assistant_service: assistant_turn_started | device_id='192.168.1.9' | capture_token='bf519ebb00010a1e' | public_base_url='http://192.168.1.8:8387' | text_input='Put your head.'
+2026-04-17 00:21:46 INFO google_genai.models: AFC is enabled with max remote calls: 10.
+2026-04-17 00:21:48 INFO httpx: HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent "HTTP/1.1 200 OK"
+2026-04-17 00:21:48 INFO google_genai.models: AFC is enabled with max remote calls: 10.
+2026-04-17 00:21:51 INFO httpx: HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent "HTTP/1.1 200 OK"
+2026-04-17 00:21:52 INFO assistant_service: assistant_tts_ready | capture_token='bf519ebb00010a1e' | asset_id='tts_1bb8985b19264688b872892dab96eb0e' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_1bb8985b19264688b872892dab96eb0e.wav' | spoken_text='Ồ bạn đang muốn nói gì vậy Mình chưa hiểu lắm câu này'
+2026-04-17 00:21:52 INFO assistant_service: assistant_turn_completed | capture_token='bf519ebb00010a1e' | assistant_status='conversation_active' | route_group='conversation' | has_tts=True | has_media=False | esp_message_count=2
+2026-04-17 00:21:52 INFO audio_receiver: assistant_turn_ready_for_device | session_id='20260416T172127933951Z' | capture_token='bf519ebb00010a1e' | assistant_status='conversation_active' | route_group='conversation' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_1bb8985b19264688b872892dab96eb0e.wav' | esp_message_count=2
+2026-04-17 00:21:52 INFO audio_receiver: device_payload_sending | session_id='20260416T172127933951Z' | ws_url='ws://192.168.1.9:81/' | payload_type='audio_session_state' | capture_token='bf519ebb00010a1e'
+2026-04-17 00:21:52 INFO audio_receiver: device_payload_sending | session_id='20260416T172127933951Z' | ws_url='ws://192.168.1.9:81/' | payload_type='assistant_playback' | capture_token='bf519ebb00010a1e' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_1bb8985b19264688b872892dab96eb0e.wav' | final_state='streaming'
+2026-04-17 00:21:52 INFO audio_receiver: capture_loop_finalized | session_id='20260416T172127933951Z' | state='completed' | total_frames=51840 | last_file_path='/Users/phatv/Documents/dev-local/smart-speaker/server/backend/recordings/capture_20260417_002127_934451.wav' | capture_token='bf519ebb00010a1e'
+2026-04-17 00:23:32 INFO __main__: audio_capture_start_requested | ws_host='192.168.1.9' | ws_port=81 | first_utterance_state='thinking' | no_speech_timeout_seconds=10.0 | public_base_url='http://192.168.1.8:8387' | configured_public_base_url='http://localhost:8387' | capture_token='b3b295960000b26c'
+2026-04-17 00:23:32 INFO werkzeug: 192.168.1.9 - - [17/Apr/2026 00:23:32] "[35m[1mPOST /api/audio/start HTTP/1.1[0m" 202 -
+2026-04-17 00:23:32 INFO audio_receiver: capture_connecting | session_id='20260416T172332302636Z' | ws_url='ws://192.168.1.9:81/' | capture_token='b3b295960000b26c' | public_base_url='http://192.168.1.8:8387'
+2026-04-17 00:23:32 INFO audio_receiver: capture_connected | session_id='20260416T172332302636Z' | ws_url='ws://192.168.1.9:81/' | capture_token='b3b295960000b26c'
+2026-04-17 00:23:32 INFO audio_receiver: capture_file_opened | path=PosixPath('/Users/phatv/Documents/dev-local/smart-speaker/server/backend/recordings/capture_20260417_002332_303505.wav')
+2026-04-17 00:23:34 WARNING audio_receiver: capture_stream_stats | session_id='20260416T172332302636Z' | capture_token='b3b295960000b26c' | interval_seconds=2.171 | packets=33 | audio_seconds=0.66 | realtime_ratio=0.304 | total_packets=33 | total_frames=10560
+2026-04-17 00:23:36 INFO audio_receiver: capture_stream_stats | session_id='20260416T172332302636Z' | capture_token='b3b295960000b26c' | interval_seconds=2.028 | packets=157 | audio_seconds=3.14 | realtime_ratio=1.548 | total_packets=190 | total_frames=60800
+2026-04-17 00:23:38 INFO audio_receiver: capture_stream_stats | session_id='20260416T172332302636Z' | capture_token='b3b295960000b26c' | interval_seconds=2.013 | packets=100 | audio_seconds=2.0 | realtime_ratio=0.994 | total_packets=290 | total_frames=92800
+2026-04-17 00:23:40 INFO audio_receiver: capture_pending_speech_flushed | session_id='20260416T172332302636Z' | capture_token='b3b295960000b26c' | completion_reason='input_idle' | duration_seconds=4.32 | speech_blocks=103
+2026-04-17 00:23:40 INFO audio_receiver: device_state_sending | session_id='20260416T172332302636Z' | ws_url='ws://192.168.1.9:81/' | state='thinking' | reason='first_utterance_detected' | stop_capture=False | capture_token='b3b295960000b26c'
+2026-04-17 00:23:40 INFO faster_whisper: Processing audio with duration 00:04.320
+2026-04-17 00:23:47 INFO faster_whisper: Detected language 'vi' with probability 0.99
+2026-04-17 00:23:57 INFO audio_receiver: first_utterance_transcribed | session_id='20260416T172332302636Z' | capture_token='b3b295960000b26c' | language='vi' | transcript='Phát bài nhạc lạc trôi của Sơn Tùng MTP'
+2026-04-17 00:23:57 INFO assistant_service: assistant_turn_started | device_id='192.168.1.9' | capture_token='b3b295960000b26c' | public_base_url='http://192.168.1.8:8387' | text_input='Phát bài nhạc lạc trôi của Sơn Tùng MTP'
+2026-04-17 00:23:57 INFO google_genai.models: AFC is enabled with max remote calls: 10.
+2026-04-17 00:24:01 INFO httpx: HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent "HTTP/1.1 200 OK"
+2026-04-17 00:24:04 INFO google_genai.models: AFC is enabled with max remote calls: 10.
+2026-04-17 00:24:07 INFO httpx: HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent "HTTP/1.1 200 OK"
+2026-04-17 00:24:08 INFO assistant_service: assistant_tts_ready | capture_token='b3b295960000b26c' | asset_id='tts_311cbca66539436c85e395b4d30a6767' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_311cbca66539436c85e395b4d30a6767.wav' | spoken_text='Tuyệt vời Mình đã tìm thấy bài Lạc Trôi của Sơn Tùng M Tp và đang phát cho bạn nghe rồi đó'
+2026-04-17 00:24:08 INFO assistant_service: assistant_media_ready | capture_token='b3b295960000b26c' | asset_id='media_2ac0c3d10fb14abd8b2e2c22b76a98d8' | media_url='http://192.168.1.8:8387/api/assets/media/media_2ac0c3d10fb14abd8b2e2c22b76a98d8.wav' | source_url='http://localhost:8387/api/media/youtube/stream?video_id=WQU8avEv6CQ&mode=audio' | title='Lạc Trôi | Sơn Tùng MTP ‹ Lyric Video ›'
+2026-04-17 00:24:08 INFO assistant_service: assistant_turn_completed | capture_token='b3b295960000b26c' | assistant_status='completed' | route_group='media' | has_tts=True | has_media=True | esp_message_count=2
+2026-04-17 00:24:08 INFO audio_receiver: assistant_turn_ready_for_device | session_id='20260416T172332302636Z' | capture_token='b3b295960000b26c' | assistant_status='completed' | route_group='media' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_311cbca66539436c85e395b4d30a6767.wav' | media_url='http://192.168.1.8:8387/api/assets/media/media_2ac0c3d10fb14abd8b2e2c22b76a98d8.wav' | esp_message_count=2
+2026-04-17 00:24:08 INFO audio_receiver: device_payload_sending | session_id='20260416T172332302636Z' | ws_url='ws://192.168.1.9:81/' | payload_type='audio_session_state' | capture_token='b3b295960000b26c'
+2026-04-17 00:24:09 INFO audio_receiver: device_payload_sending | session_id='20260416T172332302636Z' | ws_url='ws://192.168.1.9:81/' | payload_type='assistant_playback' | capture_token='b3b295960000b26c' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_311cbca66539436c85e395b4d30a6767.wav' | media_url='http://192.168.1.8:8387/api/assets/media/media_2ac0c3d10fb14abd8b2e2c22b76a98d8.wav' | final_state='streaming'
+2026-04-17 00:24:09 INFO audio_receiver: capture_loop_finalized | session_id='20260416T172332302636Z' | state='completed' | total_frames=104320 | last_file_path='/Users/phatv/Documents/dev-local/smart-speaker/server/backend/recordings/capture_20260417_002332_303505.wav' | capture_token='b3b295960000b26c'
+2026-04-17 00:29:54 INFO __main__: audio_capture_start_requested | ws_host='192.168.1.9' | ws_port=81 | first_utterance_state='thinking' | no_speech_timeout_seconds=10.0 | public_base_url='http://192.168.1.8:8387' | configured_public_base_url='http://localhost:8387' | capture_token='76f4cb0000003cbb'
+2026-04-17 00:29:54 INFO audio_receiver: capture_connecting | session_id='20260416T172954478221Z' | ws_url='ws://192.168.1.9:81/' | capture_token='76f4cb0000003cbb' | public_base_url='http://192.168.1.8:8387'
+2026-04-17 00:29:54 INFO werkzeug: 192.168.1.9 - - [17/Apr/2026 00:29:54] "[35m[1mPOST /api/audio/start HTTP/1.1[0m" 202 -
+2026-04-17 00:29:54 INFO audio_receiver: capture_connected | session_id='20260416T172954478221Z' | ws_url='ws://192.168.1.9:81/' | capture_token='76f4cb0000003cbb'
+2026-04-17 00:29:54 INFO audio_receiver: capture_file_opened | path=PosixPath('/Users/phatv/Documents/dev-local/smart-speaker/server/backend/recordings/capture_20260417_002954_478585.wav')
+2026-04-17 00:29:56 INFO audio_receiver: capture_stream_stats | session_id='20260416T172954478221Z' | capture_token='76f4cb0000003cbb' | interval_seconds=2.005 | packets=94 | audio_seconds=1.88 | realtime_ratio=0.938 | total_packets=94 | total_frames=30080
+2026-04-17 00:29:56 INFO audio_receiver: device_state_sending | session_id='20260416T172954478221Z' | ws_url='ws://192.168.1.9:81/' | state='thinking' | reason='first_utterance_detected' | stop_capture=False | capture_token='76f4cb0000003cbb'
+2026-04-17 00:29:57 INFO faster_whisper: Processing audio with duration 00:02.176
+2026-04-17 00:30:04 INFO faster_whisper: Detected language 'vi' with probability 0.65
+2026-04-17 00:30:12 INFO audio_receiver: first_utterance_transcribed | session_id='20260416T172954478221Z' | capture_token='76f4cb0000003cbb' | language='vi' | transcript='Chào bạn'
+2026-04-17 00:30:12 INFO assistant_service: assistant_turn_started | device_id='192.168.1.9' | capture_token='76f4cb0000003cbb' | public_base_url='http://192.168.1.8:8387' | text_input='Chào bạn'
+2026-04-17 00:30:12 INFO google_genai.models: AFC is enabled with max remote calls: 10.
+2026-04-17 00:30:15 INFO httpx: HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent "HTTP/1.1 200 OK"
+2026-04-17 00:30:15 INFO google_genai.models: AFC is enabled with max remote calls: 10.
+2026-04-17 00:30:18 INFO httpx: HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent "HTTP/1.1 200 OK"
+2026-04-17 00:30:20 INFO assistant_service: assistant_tts_ready | capture_token='76f4cb0000003cbb' | asset_id='tts_ec11872f336245c38e7090aa73c88bbd' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_ec11872f336245c38e7090aa73c88bbd.wav' | spoken_text='Chào bạn Rất vui được trò chuyện với bạn Bạn có muốn mình bật một bài hát không'
+2026-04-17 00:30:20 INFO assistant_service: assistant_turn_completed | capture_token='76f4cb0000003cbb' | assistant_status='conversation_active' | route_group='conversation' | has_tts=True | has_media=False | esp_message_count=2
+2026-04-17 00:30:20 INFO audio_receiver: assistant_turn_ready_for_device | session_id='20260416T172954478221Z' | capture_token='76f4cb0000003cbb' | assistant_status='conversation_active' | route_group='conversation' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_ec11872f336245c38e7090aa73c88bbd.wav' | esp_message_count=2
+2026-04-17 00:30:20 INFO audio_receiver: device_payload_sending | session_id='20260416T172954478221Z' | ws_url='ws://192.168.1.9:81/' | payload_type='audio_session_state' | capture_token='76f4cb0000003cbb'
+2026-04-17 00:30:20 INFO audio_receiver: device_payload_sending | session_id='20260416T172954478221Z' | ws_url='ws://192.168.1.9:81/' | payload_type='assistant_playback' | capture_token='76f4cb0000003cbb' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_ec11872f336245c38e7090aa73c88bbd.wav' | final_state='streaming'
+2026-04-17 00:30:23 INFO audio_receiver: capture_loop_finalized | session_id='20260416T172954478221Z' | state='completed' | total_frames=38400 | last_file_path='/Users/phatv/Documents/dev-local/smart-speaker/server/backend/recordings/capture_20260417_002954_478585.wav' | capture_token='76f4cb0000003cbb'
+2026-04-17 00:32:17 INFO __main__: audio_capture_start_requested | ws_host='192.168.1.9' | ws_port=81 | first_utterance_state='thinking' | no_speech_timeout_seconds=10.0 | public_base_url='http://192.168.1.8:8387' | configured_public_base_url='http://localhost:8387' | capture_token='cbb9a90f0001935d'
+2026-04-17 00:32:17 INFO werkzeug: 192.168.1.9 - - [17/Apr/2026 00:32:17] "[35m[1mPOST /api/audio/start HTTP/1.1[0m" 202 -
+2026-04-17 00:32:17 INFO audio_receiver: capture_connecting | session_id='20260416T173217187909Z' | ws_url='ws://192.168.1.9:81/' | capture_token='cbb9a90f0001935d' | public_base_url='http://192.168.1.8:8387'
+2026-04-17 00:32:17 INFO audio_receiver: capture_connected | session_id='20260416T173217187909Z' | ws_url='ws://192.168.1.9:81/' | capture_token='cbb9a90f0001935d'
+2026-04-17 00:32:17 INFO audio_receiver: capture_file_opened | path=PosixPath('/Users/phatv/Documents/dev-local/smart-speaker/server/backend/recordings/capture_20260417_003217_188814.wav')
+2026-04-17 00:32:19 INFO audio_receiver: capture_stream_stats | session_id='20260416T173217187909Z' | capture_token='cbb9a90f0001935d' | interval_seconds=2.017 | packets=99 | audio_seconds=1.98 | realtime_ratio=0.982 | total_packets=99 | total_frames=31680
+2026-04-17 00:32:21 WARNING audio_receiver: capture_stream_stats | session_id='20260416T173217187909Z' | capture_token='cbb9a90f0001935d' | interval_seconds=2.127 | packets=61 | audio_seconds=1.22 | realtime_ratio=0.574 | total_packets=160 | total_frames=51200
+2026-04-17 00:32:22 INFO audio_receiver: device_state_sending | session_id='20260416T173217187909Z' | ws_url='ws://192.168.1.9:81/' | state='thinking' | reason='first_utterance_detected' | stop_capture=False | capture_token='cbb9a90f0001935d'
+2026-04-17 00:32:22 INFO faster_whisper: Processing audio with duration 00:02.496
+2026-04-17 00:32:30 INFO faster_whisper: Detected language 'en' with probability 0.86
+2026-04-17 00:32:40 INFO audio_receiver: first_utterance_transcribed | session_id='20260416T173217187909Z' | capture_token='cbb9a90f0001935d' | language='en' | transcript="And now I'm going to do context."
+2026-04-17 00:32:40 INFO assistant_service: assistant_turn_started | device_id='192.168.1.9' | capture_token='cbb9a90f0001935d' | public_base_url='http://192.168.1.8:8387' | text_input="And now I'm going to do context."
+2026-04-17 00:32:40 INFO google_genai.models: AFC is enabled with max remote calls: 10.
+2026-04-17 00:32:43 INFO httpx: HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent "HTTP/1.1 200 OK"
+2026-04-17 00:32:43 INFO google_genai.models: AFC is enabled with max remote calls: 10.
+2026-04-17 00:32:46 INFO httpx: HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent "HTTP/1.1 200 OK"
+2026-04-17 00:32:47 INFO assistant_service: assistant_tts_ready | capture_token='cbb9a90f0001935d' | asset_id='tts_dcd647f0c16b4dd1a29b2769e9169752' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_dcd647f0c16b4dd1a29b2769e9169752.wav' | spoken_text='À bạn muốn thử nghiệm với ngữ cảnh à Mình luôn sẵn sàng Bạn muốn mình làm gì với ngữ cảnh bây giờ'
+2026-04-17 00:32:47 INFO assistant_service: assistant_turn_completed | capture_token='cbb9a90f0001935d' | assistant_status='conversation_active' | route_group='conversation' | has_tts=True | has_media=False | esp_message_count=2
+2026-04-17 00:32:47 INFO audio_receiver: assistant_turn_ready_for_device | session_id='20260416T173217187909Z' | capture_token='cbb9a90f0001935d' | assistant_status='conversation_active' | route_group='conversation' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_dcd647f0c16b4dd1a29b2769e9169752.wav' | esp_message_count=2
+2026-04-17 00:32:47 INFO audio_receiver: device_payload_sending | session_id='20260416T173217187909Z' | ws_url='ws://192.168.1.9:81/' | payload_type='audio_session_state' | capture_token='cbb9a90f0001935d'
+2026-04-17 00:32:48 INFO audio_receiver: device_payload_sending | session_id='20260416T173217187909Z' | ws_url='ws://192.168.1.9:81/' | payload_type='assistant_playback' | capture_token='cbb9a90f0001935d' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_dcd647f0c16b4dd1a29b2769e9169752.wav' | final_state='streaming'
+2026-04-17 00:32:48 INFO audio_receiver: capture_loop_finalized | session_id='20260416T173217187909Z' | state='completed' | total_frames=56320 | last_file_path='/Users/phatv/Documents/dev-local/smart-speaker/server/backend/recordings/capture_20260417_003217_188814.wav' | capture_token='cbb9a90f0001935d'
+2026-04-17 00:40:47 INFO __main__: audio_capture_start_requested | ws_host='192.168.1.9' | ws_port=81 | first_utterance_state='thinking' | no_speech_timeout_seconds=10.0 | public_base_url='http://192.168.1.8:8387' | configured_public_base_url='http://localhost:8387' | capture_token='60af9f9700003207'
+2026-04-17 00:40:47 INFO werkzeug: 192.168.1.9 - - [17/Apr/2026 00:40:47] "[35m[1mPOST /api/audio/start HTTP/1.1[0m" 202 -
+2026-04-17 00:40:47 INFO audio_receiver: capture_connecting | session_id='20260416T174047109829Z' | ws_url='ws://192.168.1.9:81/' | capture_token='60af9f9700003207' | public_base_url='http://192.168.1.8:8387'
+2026-04-17 00:40:47 INFO audio_receiver: capture_connected | session_id='20260416T174047109829Z' | ws_url='ws://192.168.1.9:81/' | capture_token='60af9f9700003207'
+2026-04-17 00:40:47 INFO audio_receiver: capture_file_opened | path=PosixPath('/Users/phatv/Documents/dev-local/smart-speaker/server/backend/recordings/capture_20260417_004047_110790.wav')
+2026-04-17 00:40:49 INFO audio_receiver: capture_stream_stats | session_id='20260416T174047109829Z' | capture_token='60af9f9700003207' | interval_seconds=2.005 | packets=94 | audio_seconds=1.88 | realtime_ratio=0.938 | total_packets=94 | total_frames=30080
+2026-04-17 00:40:49 INFO audio_receiver: device_state_sending | session_id='20260416T174047109829Z' | ws_url='ws://192.168.1.9:81/' | state='thinking' | reason='first_utterance_detected' | stop_capture=False | capture_token='60af9f9700003207'
+2026-04-17 00:40:49 INFO faster_whisper: Processing audio with duration 00:02.048
+2026-04-17 00:40:57 INFO faster_whisper: Detected language 'hu' with probability 0.13
+2026-04-17 00:41:15 INFO audio_receiver: first_utterance_transcribed | session_id='20260416T174047109829Z' | capture_token='60af9f9700003207' | language='hu' | transcript='Kiválasztjuk.'
+2026-04-17 00:41:15 INFO assistant_service: assistant_turn_started | device_id='192.168.1.9' | capture_token='60af9f9700003207' | public_base_url='http://192.168.1.8:8387' | text_input='Kiválasztjuk.'
+2026-04-17 00:41:15 INFO google_genai.models: AFC is enabled with max remote calls: 10.
+2026-04-17 00:41:18 INFO httpx: HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent "HTTP/1.1 200 OK"
+2026-04-17 00:41:18 INFO google_genai.models: AFC is enabled with max remote calls: 10.
+2026-04-17 00:41:22 INFO httpx: HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent "HTTP/1.1 200 OK"
+2026-04-17 00:41:24 INFO assistant_service: assistant_tts_ready | capture_token='60af9f9700003207' | asset_id='tts_012cfb79f0f347828d6cfc2094429356' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_012cfb79f0f347828d6cfc2094429356.wav' | spoken_text='Chào bạn Mình hiểu rồi Bạn muốn tiếp tục thử nghiệm với ngữ cảnh đúng không Bạn có thể cho mình biết bạn muốn làm gì tiếp theo với ngữ cảnh này được không'
+2026-04-17 00:41:24 INFO assistant_service: assistant_turn_completed | capture_token='60af9f9700003207' | assistant_status='conversation_active' | route_group='conversation' | has_tts=True | has_media=False | esp_message_count=2
+2026-04-17 00:41:24 INFO audio_receiver: assistant_turn_ready_for_device | session_id='20260416T174047109829Z' | capture_token='60af9f9700003207' | assistant_status='conversation_active' | route_group='conversation' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_012cfb79f0f347828d6cfc2094429356.wav' | esp_message_count=2
+2026-04-17 00:41:24 INFO audio_receiver: device_payload_sending | session_id='20260416T174047109829Z' | ws_url='ws://192.168.1.9:81/' | payload_type='audio_session_state' | capture_token='60af9f9700003207'
+2026-04-17 00:41:24 INFO audio_receiver: device_payload_sending | session_id='20260416T174047109829Z' | ws_url='ws://192.168.1.9:81/' | payload_type='assistant_playback' | capture_token='60af9f9700003207' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_012cfb79f0f347828d6cfc2094429356.wav' | final_state='streaming'
+2026-04-17 00:41:24 INFO werkzeug: 192.168.1.9 - - [17/Apr/2026 00:41:24] "GET /api/assets/tts/tts_012cfb79f0f347828d6cfc2094429356.wav HTTP/1.1" 200 -
+2026-04-17 00:41:27 INFO audio_receiver: capture_loop_finalized | session_id='20260416T174047109829Z' | state='completed' | total_frames=39040 | last_file_path='/Users/phatv/Documents/dev-local/smart-speaker/server/backend/recordings/capture_20260417_004047_110790.wav' | capture_token='60af9f9700003207'
+2026-04-17 00:41:32 INFO __main__: audio_capture_start_requested | ws_host='192.168.1.9' | ws_port=81 | first_utterance_state='thinking' | no_speech_timeout_seconds=10.0 | public_base_url='http://192.168.1.8:8387' | configured_public_base_url='http://localhost:8387' | capture_token='6bde5aa10000e4d0'
+2026-04-17 00:41:32 INFO werkzeug: 192.168.1.9 - - [17/Apr/2026 00:41:32] "[35m[1mPOST /api/audio/start HTTP/1.1[0m" 202 -
+2026-04-17 00:41:32 INFO audio_receiver: capture_connecting | session_id='20260416T174132864199Z' | ws_url='ws://192.168.1.9:81/' | capture_token='6bde5aa10000e4d0' | public_base_url='http://192.168.1.8:8387'
+2026-04-17 00:41:33 INFO audio_receiver: capture_connected | session_id='20260416T174132864199Z' | ws_url='ws://192.168.1.9:81/' | capture_token='6bde5aa10000e4d0'
+2026-04-17 00:41:33 INFO audio_receiver: capture_file_opened | path=PosixPath('/Users/phatv/Documents/dev-local/smart-speaker/server/backend/recordings/capture_20260417_004132_864777.wav')
+2026-04-17 00:41:34 INFO audio_receiver: capture_stream_stats | session_id='20260416T174132864199Z' | capture_token='6bde5aa10000e4d0' | interval_seconds=2.02 | packets=95 | audio_seconds=1.9 | realtime_ratio=0.94 | total_packets=95 | total_frames=30400
+2026-04-17 00:41:36 INFO audio_receiver: capture_stream_stats | session_id='20260416T174132864199Z' | capture_token='6bde5aa10000e4d0' | interval_seconds=2.001 | packets=83 | audio_seconds=1.66 | realtime_ratio=0.83 | total_packets=178 | total_frames=56960
+2026-04-17 00:41:39 INFO audio_receiver: capture_pending_speech_flushed | session_id='20260416T174132864199Z' | capture_token='6bde5aa10000e4d0' | completion_reason='input_idle' | duration_seconds=1.504 | speech_blocks=18
+2026-04-17 00:41:39 INFO audio_receiver: device_state_sending | session_id='20260416T174132864199Z' | ws_url='ws://192.168.1.9:81/' | state='thinking' | reason='first_utterance_detected' | stop_capture=False | capture_token='6bde5aa10000e4d0'
+2026-04-17 00:41:39 INFO faster_whisper: Processing audio with duration 00:01.504
+2026-04-17 00:41:45 INFO faster_whisper: Detected language 'vi' with probability 0.71
+2026-04-17 00:41:53 INFO audio_receiver: first_utterance_transcribed | session_id='20260416T174132864199Z' | capture_token='6bde5aa10000e4d0' | language='vi' | transcript='Hãy phát bài.'
+2026-04-17 00:41:53 INFO assistant_service: assistant_turn_started | device_id='192.168.1.9' | capture_token='6bde5aa10000e4d0' | public_base_url='http://192.168.1.8:8387' | text_input='Hãy phát bài.'
+2026-04-17 00:41:53 INFO google_genai.models: AFC is enabled with max remote calls: 10.
+2026-04-17 00:41:56 INFO httpx: HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent "HTTP/1.1 200 OK"
+2026-04-17 00:41:56 INFO google_genai.models: AFC is enabled with max remote calls: 10.
+2026-04-17 00:41:59 INFO httpx: HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent "HTTP/1.1 200 OK"
+2026-04-17 00:41:59 INFO assistant_service: assistant_tts_ready | capture_token='6bde5aa10000e4d0' | asset_id='tts_32bce13f1f8245939fc54d886d862192' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_32bce13f1f8245939fc54d886d862192.wav' | spoken_text='Bạn muốn mình phát bài gì vậy'
+2026-04-17 00:41:59 INFO assistant_service: assistant_turn_completed | capture_token='6bde5aa10000e4d0' | assistant_status='needs_clarification' | route_group='media' | has_tts=True | has_media=False | esp_message_count=2
+2026-04-17 00:41:59 INFO audio_receiver: assistant_turn_ready_for_device | session_id='20260416T174132864199Z' | capture_token='6bde5aa10000e4d0' | assistant_status='needs_clarification' | route_group='media' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_32bce13f1f8245939fc54d886d862192.wav' | esp_message_count=2
+2026-04-17 00:41:59 INFO audio_receiver: device_payload_sending | session_id='20260416T174132864199Z' | ws_url='ws://192.168.1.9:81/' | payload_type='audio_session_state' | capture_token='6bde5aa10000e4d0'
+2026-04-17 00:41:59 INFO audio_receiver: device_payload_sending | session_id='20260416T174132864199Z' | ws_url='ws://192.168.1.9:81/' | payload_type='assistant_playback' | capture_token='6bde5aa10000e4d0' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_32bce13f1f8245939fc54d886d862192.wav' | final_state='streaming'
+2026-04-17 00:42:00 INFO werkzeug: 192.168.1.9 - - [17/Apr/2026 00:42:00] "GET /api/assets/tts/tts_32bce13f1f8245939fc54d886d862192.wav HTTP/1.1" 200 -
+2026-04-17 00:42:01 INFO audio_receiver: capture_loop_finalized | session_id='20260416T174132864199Z' | state='completed' | total_frames=88000 | last_file_path='/Users/phatv/Documents/dev-local/smart-speaker/server/backend/recordings/capture_20260417_004132_864777.wav' | capture_token='6bde5aa10000e4d0'
+2026-04-17 00:42:01 INFO __main__: audio_capture_start_requested | ws_host='192.168.1.9' | ws_port=81 | first_utterance_state='thinking' | no_speech_timeout_seconds=10.0 | public_base_url='http://192.168.1.8:8387' | configured_public_base_url='http://localhost:8387' | capture_token='09206d9300015627'
+2026-04-17 00:42:01 INFO werkzeug: 192.168.1.9 - - [17/Apr/2026 00:42:01] "[35m[1mPOST /api/audio/start HTTP/1.1[0m" 202 -
+2026-04-17 00:42:01 INFO audio_receiver: capture_connecting | session_id='20260416T174201880586Z' | ws_url='ws://192.168.1.9:81/' | capture_token='09206d9300015627' | public_base_url='http://192.168.1.8:8387'
+2026-04-17 00:42:02 INFO audio_receiver: capture_connected | session_id='20260416T174201880586Z' | ws_url='ws://192.168.1.9:81/' | capture_token='09206d9300015627'
+2026-04-17 00:42:02 INFO audio_receiver: capture_file_opened | path=PosixPath('/Users/phatv/Documents/dev-local/smart-speaker/server/backend/recordings/capture_20260417_004201_880998.wav')
+2026-04-17 00:42:03 INFO audio_receiver: capture_stream_stats | session_id='20260416T174201880586Z' | capture_token='09206d9300015627' | interval_seconds=2.025 | packets=95 | audio_seconds=1.9 | realtime_ratio=0.938 | total_packets=95 | total_frames=30400
+2026-04-17 00:42:06 INFO audio_receiver: capture_pending_speech_flushed | session_id='20260416T174201880586Z' | capture_token='09206d9300015627' | completion_reason='input_idle' | duration_seconds=2.816 | speech_blocks=58
+2026-04-17 00:42:06 INFO audio_receiver: device_state_sending | session_id='20260416T174201880586Z' | ws_url='ws://192.168.1.9:81/' | state='thinking' | reason='first_utterance_detected' | stop_capture=False | capture_token='09206d9300015627'
+2026-04-17 00:42:06 INFO faster_whisper: Processing audio with duration 00:02.816
+2026-04-17 00:42:12 INFO faster_whisper: Detected language 'vi' with probability 0.99
+2026-04-17 00:42:22 INFO audio_receiver: first_utterance_transcribed | session_id='20260416T174201880586Z' | capture_token='09206d9300015627' | language='vi' | transcript='Hãy phát bài nhạc lạc trôi trên Youtube.'
+2026-04-17 00:42:22 INFO assistant_service: assistant_turn_started | device_id='192.168.1.9' | capture_token='09206d9300015627' | public_base_url='http://192.168.1.8:8387' | text_input='Hãy phát bài nhạc lạc trôi trên Youtube.'
+2026-04-17 00:42:22 INFO google_genai.models: AFC is enabled with max remote calls: 10.
+2026-04-17 00:42:26 INFO httpx: HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent "HTTP/1.1 200 OK"
+2026-04-17 00:42:29 INFO assistant_service: assistant_tts_ready | capture_token='09206d9300015627' | asset_id='tts_2cd25f628c2e45b0a7c206a565ce105b' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_2cd25f628c2e45b0a7c206a565ce105b.wav' | spoken_text='Tôi nghe không rõ Ý của bạn có phải là Lạc Trôi Remix cực chất hay hơn cả Sơn Tùng Mtp hay một video nào khác'
+2026-04-17 00:42:29 INFO assistant_service: assistant_turn_completed | capture_token='09206d9300015627' | assistant_status='needs_confirmation' | route_group='media' | has_tts=True | has_media=False | esp_message_count=2
+2026-04-17 00:42:29 INFO audio_receiver: assistant_turn_ready_for_device | session_id='20260416T174201880586Z' | capture_token='09206d9300015627' | assistant_status='needs_confirmation' | route_group='media' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_2cd25f628c2e45b0a7c206a565ce105b.wav' | esp_message_count=2
+2026-04-17 00:42:29 INFO audio_receiver: device_payload_sending | session_id='20260416T174201880586Z' | ws_url='ws://192.168.1.9:81/' | payload_type='audio_session_state' | capture_token='09206d9300015627'
+2026-04-17 00:42:29 INFO audio_receiver: device_payload_sending | session_id='20260416T174201880586Z' | ws_url='ws://192.168.1.9:81/' | payload_type='assistant_playback' | capture_token='09206d9300015627' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_2cd25f628c2e45b0a7c206a565ce105b.wav' | final_state='streaming'
+2026-04-17 00:42:29 INFO werkzeug: 192.168.1.9 - - [17/Apr/2026 00:42:29] "GET /api/assets/tts/tts_2cd25f628c2e45b0a7c206a565ce105b.wav HTTP/1.1" 200 -
+2026-04-17 00:42:32 INFO audio_receiver: capture_loop_finalized | session_id='20260416T174201880586Z' | state='completed' | total_frames=50240 | last_file_path='/Users/phatv/Documents/dev-local/smart-speaker/server/backend/recordings/capture_20260417_004201_880998.wav' | capture_token='09206d9300015627'
+2026-04-17 00:42:38 INFO __main__: audio_capture_start_requested | ws_host='192.168.1.9' | ws_port=81 | first_utterance_state='thinking' | no_speech_timeout_seconds=10.0 | public_base_url='http://192.168.1.8:8387' | configured_public_base_url='http://localhost:8387' | capture_token='3802ef4a0001e4ef'
+2026-04-17 00:42:38 INFO werkzeug: 192.168.1.9 - - [17/Apr/2026 00:42:38] "[35m[1mPOST /api/audio/start HTTP/1.1[0m" 202 -
+2026-04-17 00:42:38 INFO audio_receiver: capture_connecting | session_id='20260416T174238419263Z' | ws_url='ws://192.168.1.9:81/' | capture_token='3802ef4a0001e4ef' | public_base_url='http://192.168.1.8:8387'
+2026-04-17 00:42:38 INFO audio_receiver: capture_connected | session_id='20260416T174238419263Z' | ws_url='ws://192.168.1.9:81/' | capture_token='3802ef4a0001e4ef'
+2026-04-17 00:42:38 INFO audio_receiver: capture_file_opened | path=PosixPath('/Users/phatv/Documents/dev-local/smart-speaker/server/backend/recordings/capture_20260417_004238_419702.wav')
+2026-04-17 00:42:40 INFO audio_receiver: capture_stream_stats | session_id='20260416T174238419263Z' | capture_token='3802ef4a0001e4ef' | interval_seconds=2.003 | packets=94 | audio_seconds=1.88 | realtime_ratio=0.939 | total_packets=94 | total_frames=30080
+2026-04-17 00:42:42 INFO audio_receiver: capture_pending_speech_flushed | session_id='20260416T174238419263Z' | capture_token='3802ef4a0001e4ef' | completion_reason='input_idle' | duration_seconds=2.4 | speech_blocks=46
+2026-04-17 00:42:42 INFO audio_receiver: device_state_sending | session_id='20260416T174238419263Z' | ws_url='ws://192.168.1.9:81/' | state='thinking' | reason='first_utterance_detected' | stop_capture=False | capture_token='3802ef4a0001e4ef'
+2026-04-17 00:42:42 INFO faster_whisper: Processing audio with duration 00:02.400
+2026-04-17 00:42:49 INFO faster_whisper: Detected language 'vi' with probability 0.98
+2026-04-17 00:42:57 INFO audio_receiver: first_utterance_transcribed | session_id='20260416T174238419263Z' | capture_token='3802ef4a0001e4ef' | language='vi' | transcript='Lạch trôi của Sơn Tùng'
+2026-04-17 00:42:57 INFO assistant_service: assistant_turn_started | device_id='192.168.1.9' | capture_token='3802ef4a0001e4ef' | public_base_url='http://192.168.1.8:8387' | text_input='Lạch trôi của Sơn Tùng'
+2026-04-17 00:42:57 INFO google_genai.models: AFC is enabled with max remote calls: 10.
+2026-04-17 00:42:59 INFO httpx: HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemma-3-4b-it:generateContent "HTTP/1.1 200 OK"
+2026-04-17 00:42:59 INFO google_genai.models: AFC is enabled with max remote calls: 10.
+2026-04-17 00:43:04 INFO httpx: HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent "HTTP/1.1 200 OK"
+2026-04-17 00:43:07 INFO google_genai.models: AFC is enabled with max remote calls: 10.
+2026-04-17 00:43:10 INFO httpx: HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent "HTTP/1.1 200 OK"
+2026-04-17 00:43:12 INFO assistant_service: assistant_tts_ready | capture_token='3802ef4a0001e4ef' | asset_id='tts_defab146ea6f4bd69df545036624e285' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_defab146ea6f4bd69df545036624e285.wav' | spoken_text='Tuyệt vời Mình đã tìm thấy bài Lạc Trôi của Sơn Tùng M Tp và đang phát cho bạn nghe rồi đó'
+2026-04-17 00:43:12 INFO assistant_service: assistant_media_ready | capture_token='3802ef4a0001e4ef' | asset_id='media_19c4e1fcfd074a9c9ca64a3249b2a32d' | media_url='http://192.168.1.8:8387/api/assets/media/media_19c4e1fcfd074a9c9ca64a3249b2a32d.wav' | source_url='http://localhost:8387/api/media/youtube/stream?video_id=WQU8avEv6CQ&mode=audio' | title='Lạc Trôi | Sơn Tùng MTP ‹ Lyric Video ›'
+2026-04-17 00:43:12 INFO assistant_service: assistant_turn_completed | capture_token='3802ef4a0001e4ef' | assistant_status='completed' | route_group='media' | has_tts=True | has_media=True | esp_message_count=2
+2026-04-17 00:43:12 INFO audio_receiver: assistant_turn_ready_for_device | session_id='20260416T174238419263Z' | capture_token='3802ef4a0001e4ef' | assistant_status='completed' | route_group='media' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_defab146ea6f4bd69df545036624e285.wav' | media_url='http://192.168.1.8:8387/api/assets/media/media_19c4e1fcfd074a9c9ca64a3249b2a32d.wav' | esp_message_count=2
+2026-04-17 00:43:12 INFO audio_receiver: device_payload_sending | session_id='20260416T174238419263Z' | ws_url='ws://192.168.1.9:81/' | payload_type='audio_session_state' | capture_token='3802ef4a0001e4ef'
+2026-04-17 00:43:12 INFO audio_receiver: device_payload_sending | session_id='20260416T174238419263Z' | ws_url='ws://192.168.1.9:81/' | payload_type='assistant_playback' | capture_token='3802ef4a0001e4ef' | tts_url='http://192.168.1.8:8387/api/assets/tts/tts_defab146ea6f4bd69df545036624e285.wav' | media_url='http://192.168.1.8:8387/api/assets/media/media_19c4e1fcfd074a9c9ca64a3249b2a32d.wav' | final_state='streaming'
+2026-04-17 00:43:12 INFO werkzeug: 192.168.1.9 - - [17/Apr/2026 00:43:12] "GET /api/assets/tts/tts_defab146ea6f4bd69df545036624e285.wav HTTP/1.1" 200 -
+2026-04-17 00:43:15 INFO audio_receiver: capture_loop_finalized | session_id='20260416T174238419263Z' | state='completed' | total_frames=55040 | last_file_path='/Users/phatv/Documents/dev-local/smart-speaker/server/backend/recordings/capture_20260417_004238_419702.wav' | capture_token='3802ef4a0001e4ef'
+2026-04-17 00:43:19 INFO werkzeug: 127.0.0.1 - - [17/Apr/2026 00:43:19] "[35m[1mGET /api/media/youtube/stream?video_id=WQU8avEv6CQ&mode=audio HTTP/1.1[0m" 206 -
+2026-04-17 00:43:19 INFO werkzeug: 192.168.1.9 - - [17/Apr/2026 00:43:19] "GET /api/assets/media/media_19c4e1fcfd074a9c9ca64a3249b2a32d.wav HTTP/1.1" 200 -
+2026-04-17 00:43:19 INFO __main__: audio_capture_start_requested | ws_host='192.168.1.9' | ws_port=81 | first_utterance_state='thinking' | no_speech_timeout_seconds=10.0 | public_base_url='http://192.168.1.8:8387' | configured_public_base_url='http://localhost:8387' | capture_token='c801eefc00028716'
+2026-04-17 00:43:19 INFO audio_receiver: capture_connecting | session_id='20260416T174319952135Z' | ws_url='ws://192.168.1.9:81/' | capture_token='c801eefc00028716' | public_base_url='http://192.168.1.8:8387'
+2026-04-17 00:43:19 INFO werkzeug: 192.168.1.9 - - [17/Apr/2026 00:43:19] "[35m[1mPOST /api/audio/start HTTP/1.1[0m" 202 -
+2026-04-17 00:43:20 INFO audio_receiver: capture_connected | session_id='20260416T174319952135Z' | ws_url='ws://192.168.1.9:81/' | capture_token='c801eefc00028716'
+2026-04-17 00:43:20 INFO audio_receiver: capture_file_opened | path=PosixPath('/Users/phatv/Documents/dev-local/smart-speaker/server/backend/recordings/capture_20260417_004319_952343.wav')
+2026-04-17 00:43:21 INFO audio_receiver: capture_stream_stats | session_id='20260416T174319952135Z' | capture_token='c801eefc00028716' | interval_seconds=2.014 | packets=94 | audio_seconds=1.88 | realtime_ratio=0.933 | total_packets=94 | total_frames=30080
+2026-04-17 00:43:24 INFO audio_receiver: capture_stream_stats | session_id='20260416T174319952135Z' | capture_token='c801eefc00028716' | interval_seconds=2.036 | packets=101 | audio_seconds=2.02 | realtime_ratio=0.992 | total_packets=195 | total_frames=62400
+2026-04-17 00:43:27 WARNING audio_receiver: capture_stream_stats | session_id='20260416T174319952135Z' | capture_token='c801eefc00028716' | interval_seconds=3.109 | packets=52 | audio_seconds=1.04 | realtime_ratio=0.335 | total_packets=247 | total_frames=79040
+2026-04-17 00:43:29 INFO audio_receiver: capture_stream_stats | session_id='20260416T174319952135Z' | capture_token='c801eefc00028716' | interval_seconds=2.013 | packets=157 | audio_seconds=3.14 | realtime_ratio=1.56 | total_packets=404 | total_frames=129280
+2026-04-17 00:43:29 INFO audio_receiver: capture_no_speech_timeout | session_id='20260416T174319952135Z' | timeout_seconds=10.0 | capture_token='c801eefc00028716'
+2026-04-17 00:43:29 INFO audio_receiver: device_state_sending | session_id='20260416T174319952135Z' | ws_url='ws://192.168.1.9:81/' | state='wait_wakeword' | reason='no_speech_timeout' | stop_capture=True | capture_token='c801eefc00028716'
+2026-04-17 00:43:30 INFO audio_receiver: capture_loop_finalized | session_id='20260416T174319952135Z' | state='completed' | total_frames=142720 | last_file_path='/Users/phatv/Documents/dev-local/smart-speaker/server/backend/recordings/capture_20260417_004319_952343.wav' | capture_token='c801eefc00028716'

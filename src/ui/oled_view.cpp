@@ -298,6 +298,20 @@ void drawThinkingDecoration(unsigned long elapsedMs) {
     }
 }
 
+void drawSpeakingDecoration(unsigned long elapsedMs) {
+    const int bobOffset = static_cast<int>((elapsedMs / 220) % 3);
+
+    display.drawLine(96, 13 - bobOffset, 96, 6 - bobOffset, SSD1306_WHITE);
+    display.drawLine(96, 6 - bobOffset, 102, 9 - bobOffset, SSD1306_WHITE);
+    display.fillCircle(94, 14 - bobOffset, 2, SSD1306_WHITE);
+    display.fillCircle(100, 11 - bobOffset, 2, SSD1306_WHITE);
+
+    display.drawLine(108, 18 + bobOffset, 108, 10 + bobOffset, SSD1306_WHITE);
+    display.drawLine(108, 10 + bobOffset, 114, 13 + bobOffset, SSD1306_WHITE);
+    display.fillCircle(106, 19 + bobOffset, 2, SSD1306_WHITE);
+    display.fillCircle(112, 15 + bobOffset, 2, SSD1306_WHITE);
+}
+
 void drawWaveformInRect(const int16_t rawData[],
                         int rawLen,
                         int x,
@@ -575,6 +589,22 @@ void oledDrawThinkingFace(unsigned long elapsedMs) {
     drawCheek(101, 42);
     drawThinkingMouth(elapsedMs);
     drawThinkingDecoration(elapsedMs);
+
+    display.display();
+}
+
+void oledDrawSpeakingFace(const int16_t rawData[], int rawLen, unsigned long elapsedMs) {
+    display.clearDisplay();
+    display.setFont();
+    display.setTextSize(1);
+
+    drawRobotHeadFrame();
+    drawEye(kLeftEyeCenterX, kEyeCenterY, -1, 1);
+    drawEye(kRightEyeCenterX, kEyeCenterY, 1, 1);
+    drawCheek(27, 42);
+    drawCheek(101, 42);
+    drawWaveformInRect(rawData, rawLen, kMouthBoxX, kMouthBoxY, kMouthBoxWidth, kMouthBoxHeight);
+    drawSpeakingDecoration(elapsedMs);
 
     display.display();
 }

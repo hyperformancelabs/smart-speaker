@@ -66,6 +66,7 @@ class AssistantServiceTests(unittest.TestCase):
                 {
                     "nfc_tag_id": "tag-1",
                     "device_id": "browser-1",
+                    "capture_token": "cap-1",
                     "text_input": "hello",
                 }
             )
@@ -133,6 +134,8 @@ class AssistantServiceTests(unittest.TestCase):
                 {
                     "user_id": "user-1",
                     "device_id": "browser-1",
+                    "capture_token": "cap-2",
+                    "public_base_url": "http://192.168.1.8:8387",
                     "text_input": "phát lo-fi",
                 }
             )
@@ -140,7 +143,72 @@ class AssistantServiceTests(unittest.TestCase):
         self.assertEqual(result["playback"]["media_after_tts"]["stream_url"], "http://localhost/media_456.wav")
         self.assertEqual(result["commands_for_device"][0]["transcoded_stream_url"], "http://localhost/media_456.wav")
         self.assertEqual(result["esp_messages"][0]["type"], "audio_session_state")
+        self.assertEqual(result["esp_messages"][0]["capture_token"], "cap-2")
         self.assertEqual(result["esp_messages"][1]["type"], "assistant_playback")
+        self.assertEqual(result["esp_messages"][1]["capture_token"], "cap-2")
+        self.assertEqual(result["esp_messages"][1]["final_state"], "streaming")
+
+    def test_run_assistant_turn_passes_public_base_url_to_asset_registry(self) -> None:
+        with patch.object(assistant_service.device_session_store, "get", return_value=None), patch.object(
+            assistant_service.device_session_store,
+            "set",
+        ), patch.object(
+            assistant_service,
+            "run_pipeline",
+            return_value={
+                "tts_text": "Xin chào bạn",
+                "status": "completed",
+                "route": {"group": "conversation"},
+                "session_state": {"mode": "router"},
+                "commands": [
+                    {
+                        "type": "audio_stream",
+                        "stream_url": "https://upstream.example/song.m4a",
+                        "title": "Song",
+                        "source": "youtube",
+                    }
+                ],
+            },
+        ), patch.object(
+            assistant_service.tts_service,
+            "synthesize",
+            return_value=SimpleNamespace(
+                text="Xin chào bạn",
+                spoken_text="Xin chao ban",
+                file_path=Path("/tmp/fake_tts.wav"),
+                duration_seconds=1.0,
+                voice_name="voice-a",
+                sample_rate=16000,
+                channels=1,
+            ),
+        ), patch.object(
+            assistant_service.asset_registry,
+            "register_tts_file",
+            return_value=SimpleNamespace(asset_id="tts_abc"),
+        ), patch.object(
+            assistant_service.asset_registry,
+            "build_tts_url",
+            return_value="http://192.168.1.8:8387/api/assets/tts/tts_abc.wav",
+        ) as build_tts_url_mock, patch.object(
+            assistant_service.asset_registry,
+            "register_media_source",
+            return_value=SimpleNamespace(asset_id="media_def", metadata={"title": "Song", "source": "youtube"}),
+        ), patch.object(
+            assistant_service.asset_registry,
+            "build_media_url",
+            return_value="http://192.168.1.8:8387/api/assets/media/media_def.wav",
+        ) as build_media_url_mock:
+            assistant_service.run_assistant_turn(
+                {
+                    "user_id": "user-1",
+                    "device_id": "esp-1",
+                    "public_base_url": "http://192.168.1.8:8387",
+                    "text_input": "chào bạn",
+                }
+            )
+
+        build_tts_url_mock.assert_called_once_with("tts_abc", base_url="http://192.168.1.8:8387")
+        build_media_url_mock.assert_called_once_with("media_def", base_url="http://192.168.1.8:8387")
 
 
 if __name__ == "__main__":

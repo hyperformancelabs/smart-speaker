@@ -10,6 +10,7 @@
 
 void setup() {
     serialTelemetryBegin();
+    audioLogBootDiagnostics();
     oledInit();
     oledDrawStartup(0);
 

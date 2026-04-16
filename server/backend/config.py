@@ -73,3 +73,6 @@ MAX_CONTEXT_SUMMARY_CHARS = int(os.getenv("MAX_CONTEXT_SUMMARY_CHARS", "1500"))
 # Logging
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 LOG_FILE = os.getenv("LOG_FILE", "llm_pipeline.log")
+LOG_FILE_PATH = Path(LOG_FILE).expanduser()
+if not LOG_FILE_PATH.is_absolute():
+    LOG_FILE_PATH = (BASE_DIR / LOG_FILE_PATH).resolve()

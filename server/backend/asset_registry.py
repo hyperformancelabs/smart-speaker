@@ -76,11 +76,13 @@ class AssetRegistry:
         with self._lock:
             return self._records.get(asset_id)
 
-    def build_tts_url(self, asset_id: str) -> str:
-        return f"{VOICE_BACKEND_PUBLIC_BASE_URL.rstrip('/')}/api/assets/tts/{asset_id}.wav"
+    def build_tts_url(self, asset_id: str, *, base_url: str | None = None) -> str:
+        resolved_base_url = str(base_url or VOICE_BACKEND_PUBLIC_BASE_URL).rstrip("/")
+        return f"{resolved_base_url}/api/assets/tts/{asset_id}.wav"
 
-    def build_media_url(self, asset_id: str) -> str:
-        return f"{VOICE_BACKEND_PUBLIC_BASE_URL.rstrip('/')}/api/assets/media/{asset_id}.wav"
+    def build_media_url(self, asset_id: str, *, base_url: str | None = None) -> str:
+        resolved_base_url = str(base_url or VOICE_BACKEND_PUBLIC_BASE_URL).rstrip("/")
+        return f"{resolved_base_url}/api/assets/media/{asset_id}.wav"
 
 
 asset_registry = AssetRegistry()

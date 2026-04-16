@@ -16,3 +16,4 @@ void oledDrawGreeting(const char *name);
 void oledDrawWakewordSleep();
 void oledDrawStreamingFace(const int16_t rawData[], int rawLen);
 void oledDrawThinkingFace(unsigned long elapsedMs);
+void oledDrawSpeakingFace(const int16_t rawData[], int rawLen, unsigned long elapsedMs);

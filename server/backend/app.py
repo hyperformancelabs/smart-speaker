@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 import os
 import subprocess
@@ -13,6 +14,8 @@ from asset_registry import asset_registry
 from config import (
     BACKEND_API_URL,
     FFMPEG_BIN,
+    LOG_FILE_PATH,
+    LOG_LEVEL,
     MEDIA_TRANSCODE_CHANNELS,
     MEDIA_TRANSCODE_SAMPLE_RATE,
     VOICE_BACKEND_PORT,
@@ -20,13 +23,24 @@ from config import (
 )
 from dev_console import DEFAULT_BROWSER_DEVICE_ID, parse_json_object, run_browser_turn
 from device_session_store import device_session_store
+from logging_utils import configure_logging, is_loopback_base_url, log_kv
 from youtube_stream_tool import resolve_youtube_stream
 
 try:
-    from .audio_receiver import DEFAULT_OUTPUT_DIR, CaptureRequest, capture_manager
+    from .audio_receiver import (
+        DEFAULT_NO_SPEECH_TIMEOUT_SECONDS,
+        DEFAULT_OUTPUT_DIR,
+        CaptureRequest,
+        capture_manager,
+    )
     from .session_control import DeviceAudioSessionState, parse_device_audio_session_state
 except ImportError:
-    from audio_receiver import DEFAULT_OUTPUT_DIR, CaptureRequest, capture_manager
+    from audio_receiver import (
+        DEFAULT_NO_SPEECH_TIMEOUT_SECONDS,
+        DEFAULT_OUTPUT_DIR,
+        CaptureRequest,
+        capture_manager,
+    )
     from session_control import DeviceAudioSessionState, parse_device_audio_session_state
 
 
@@ -34,8 +48,20 @@ BASE_DIR = Path(__file__).resolve().parent
 DEFAULT_TEST_NFC_TAG_ID = os.getenv("STEP3_TEST_NFC_TAG_ID", "15:CF:D0:06")
 DEFAULT_TEST_USER_ID = os.getenv("STEP3_TEST_USER_ID", "server_test_user")
 
+configure_logging(level=LOG_LEVEL, log_file=LOG_FILE_PATH)
+logger = logging.getLogger(__name__)
+
 app = Flask(__name__)
 app.json.ensure_ascii = False
+
+if is_loopback_base_url(VOICE_BACKEND_PUBLIC_BASE_URL):
+    log_kv(
+        logger,
+        logging.WARNING,
+        "voice_backend_public_base_url_loopback",
+        configured_base_url=VOICE_BACKEND_PUBLIC_BASE_URL,
+        guidance="ESP playback needs a LAN-reachable base URL; request host override will be used for live device sessions.",
+    )
 
 
 def normalize_path(value: str | None) -> str:
@@ -71,6 +97,8 @@ def _transcode_media_stream(source_url: str):
         str(MEDIA_TRANSCODE_CHANNELS),
         "-ar",
         str(MEDIA_TRANSCODE_SAMPLE_RATE),
+        "-sample_fmt",
+        "s16",
         "-f",
         "wav",
         "pipe:1",
@@ -105,6 +133,13 @@ def _request_payload() -> dict[str, Any]:
         payload = request.get_json(silent=True) or {}
         return payload if isinstance(payload, dict) else {}
     return request.form.to_dict(flat=True)
+
+
+def resolve_request_public_base_url(*, fallback: str | None = None) -> str:
+    request_base_url = str(getattr(request, "url_root", "") or "").strip()
+    if request_base_url:
+        return request_base_url.rstrip("/")
+    return str(fallback or VOICE_BACKEND_PUBLIC_BASE_URL).rstrip("/")
 
 
 def _build_debug_session_payload(payload: dict[str, Any]) -> dict[str, Any]:
@@ -244,6 +279,9 @@ def api_youtube_stream_proxy():
 @app.route("/api/process-command", methods=["POST"])
 def process_command() -> tuple[dict[str, Any], int] | tuple[Response, int]:
     payload = request.get_json(silent=True) or {}
+    payload["public_base_url"] = resolve_request_public_base_url(
+        fallback=str(payload.get("public_base_url") or "").strip() or None,
+    )
     try:
         result = run_assistant_turn(payload)
     except ValueError as exc:
@@ -261,6 +299,9 @@ def api_test() -> tuple[dict[str, Any], int] | tuple[Response, int]:
         "user_id": str(payload.get("user_id") or DEFAULT_TEST_USER_ID).strip() or DEFAULT_TEST_USER_ID,
         "nfc_tag_id": str(payload.get("nfc_tag_id") or DEFAULT_TEST_NFC_TAG_ID).strip() or DEFAULT_TEST_NFC_TAG_ID,
         "device_id": str(payload.get("device_id") or DEFAULT_BROWSER_DEVICE_ID).strip() or DEFAULT_BROWSER_DEVICE_ID,
+        "public_base_url": resolve_request_public_base_url(
+            fallback=str(payload.get("public_base_url") or "").strip() or None,
+        ),
         "text_input": str(payload.get("text_input") or "kể cho mình một câu chuyện vui").strip()
         or "kể cho mình một câu chuyện vui",
     }
@@ -292,6 +333,9 @@ def browser_assistant_turn() -> tuple[dict[str, Any], int] | tuple[Response, int
             nfc_tag_id=debug_payload["nfc_tag_id"],
             device_id=debug_payload["device_id"],
             session_state=debug_payload["session_state"],
+            public_base_url=resolve_request_public_base_url(
+                fallback=str(payload.get("public_base_url") or "").strip() or None,
+            ),
         )
     except ValueError as exc:
         return {"error": str(exc)}, 400
@@ -344,11 +388,20 @@ def start_audio_capture():
         )
         enable_first_utterance_vad = parse_optional_bool(payload.get("enable_first_utterance_vad"))
         stop_after_first_utterance = parse_optional_bool(payload.get("stop_after_first_utterance"))
+        no_speech_timeout_value = payload.get("no_speech_timeout_seconds")
+        no_speech_timeout_seconds = (
+            DEFAULT_NO_SPEECH_TIMEOUT_SECONDS
+            if no_speech_timeout_value is None or str(no_speech_timeout_value).strip() == ""
+            else float(no_speech_timeout_value)
+        )
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
     output_dir_value = str(payload.get("output_dir") or "").strip()
     output_dir = Path(output_dir_value) if output_dir_value else DEFAULT_OUTPUT_DIR
+    public_base_url = resolve_request_public_base_url(
+        fallback=str(payload.get("public_base_url") or "").strip() or None,
+    )
 
     capture_request = CaptureRequest(
         ws_host=ws_host,
@@ -363,13 +416,28 @@ def start_audio_capture():
         enable_first_utterance_vad=True if enable_first_utterance_vad is None else enable_first_utterance_vad,
         first_utterance_state=first_utterance_state,
         stop_after_first_utterance=stop_after_first_utterance,
+        no_speech_timeout_seconds=no_speech_timeout_seconds,
+        public_base_url=public_base_url,
         nfc_tag_id=str(payload.get("nfc_tag_id") or "").strip() or None,
         user_id=str(payload.get("user_id") or "").strip() or None,
         device_id=str(payload.get("device_id") or ws_host).strip() or None,
+        capture_token=str(payload.get("capture_token") or "").strip() or None,
     )
 
+    log_kv(
+        logger,
+        logging.INFO,
+        "audio_capture_start_requested",
+        ws_host=ws_host,
+        ws_port=capture_request.ws_port,
+        first_utterance_state=capture_request.first_utterance_state.value,
+        no_speech_timeout_seconds=no_speech_timeout_seconds,
+        public_base_url=public_base_url,
+        configured_public_base_url=VOICE_BACKEND_PUBLIC_BASE_URL,
+        capture_token=capture_request.capture_token,
+    )
     status = capture_manager.start(capture_request)
-    return jsonify({"status": "started", "capture": status}), 202
+    return jsonify({"status": "started", "capture": status, "public_base_url": public_base_url}), 202
 
 
 @app.route("/api/audio/status", methods=["GET"])
@@ -383,6 +451,14 @@ def stop_audio_capture():
 
 
 def main() -> None:
+    log_kv(
+        logger,
+        logging.INFO,
+        "voice_backend_starting",
+        port=VOICE_BACKEND_PORT,
+        configured_public_base_url=VOICE_BACKEND_PUBLIC_BASE_URL,
+        log_file=LOG_FILE_PATH,
+    )
     app.run(
         host="0.0.0.0",
         port=VOICE_BACKEND_PORT,

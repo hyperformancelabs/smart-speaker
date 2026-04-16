@@ -96,6 +96,7 @@ def run_browser_turn(
     nfc_tag_id: str | None = None,
     device_id: str | None = None,
     session_state: dict[str, Any] | None = None,
+    public_base_url: str | None = None,
 ) -> dict[str, Any]:
     resolved_text = str(text_input or "").strip()
     transcription_payload: dict[str, Any] | None = None
@@ -123,6 +124,7 @@ def run_browser_turn(
         "user_id": user_id or "",
         "nfc_tag_id": nfc_tag_id or "",
         "device_id": device_id or DEFAULT_BROWSER_DEVICE_ID,
+        "public_base_url": public_base_url or "",
         "text_input": resolved_text,
         "stt_text": resolved_text,
     }

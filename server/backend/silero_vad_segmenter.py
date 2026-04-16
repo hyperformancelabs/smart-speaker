@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 import threading
+import time
 from array import array
 from collections import deque
 from dataclasses import dataclass
@@ -33,8 +34,8 @@ class SileroVadConfig:
     model_window_samples: int = 512
     vad_threshold: float = 0.50
     start_voiced_blocks: int = 2
-    short_pause_ms: int = 400
-    final_pause_ms: int = 1200
+    short_pause_ms: int = 224
+    final_pause_ms: int = 640
     min_speech_ms: int = 300
     max_utterance_ms: int = 10_000
     preroll_ms: int = 1000
@@ -84,6 +85,9 @@ class FirstUtteranceDetector:
         self.model = get_silero_vad_model()
         self._sample_buffer = bytearray()
         self._completed = False
+        self.started_monotonic = time.monotonic()
+        self.last_speech_activity_monotonic = self.started_monotonic
+        self.last_audio_monotonic = self.started_monotonic
         self._reset_detection_state()
 
     def process_pcm_bytes(self, pcm_bytes: bytes) -> SpeechSegment | None:
@@ -93,6 +97,7 @@ class FirstUtteranceDetector:
         if len(pcm_bytes) % self.config.sample_width:
             raise ValueError("incoming PCM buffer is not aligned to 16-bit samples")
 
+        self.last_audio_monotonic = time.monotonic()
         self._sample_buffer.extend(pcm_bytes)
 
         while len(self._sample_buffer) >= self.config.model_window_bytes:
@@ -110,6 +115,8 @@ class FirstUtteranceDetector:
 
         speech_prob = float(self.model(self._build_tensor(block_bytes), self.config.sample_rate).item())
         is_speech = speech_prob >= self.config.vad_threshold
+        if is_speech:
+            self.last_speech_activity_monotonic = time.monotonic()
 
         if self.state == "WAIT_FOR_SPEECH":
             self.speech_run = self.speech_run + 1 if is_speech else 0
@@ -177,3 +184,25 @@ class FirstUtteranceDetector:
         self.utterance_blocks = 0
         self.utterance: list[bytes] = []
         self.preroll: deque[bytes] = deque(maxlen=self.config.preroll_blocks)
+
+    def idle_timeout_reached(self, timeout_seconds: float | None) -> bool:
+        if timeout_seconds is None or timeout_seconds <= 0:
+            return False
+        return (time.monotonic() - self.last_speech_activity_monotonic) >= timeout_seconds
+
+    def has_pending_utterance(self) -> bool:
+        return self.state != "WAIT_FOR_SPEECH" and self.utterance_blocks > 0
+
+    def finalize_pending_if_idle(
+        self,
+        idle_seconds: float | None,
+        completion_reason: str = "input_idle",
+    ) -> SpeechSegment | None:
+        if (
+            idle_seconds is None
+            or idle_seconds <= 0
+            or not self.has_pending_utterance()
+            or (time.monotonic() - self.last_audio_monotonic) < idle_seconds
+        ):
+            return None
+        return self._finalize_if_valid(completion_reason)

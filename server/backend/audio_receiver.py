@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import signal
 import struct
 import sys
@@ -18,6 +19,7 @@ import websocket
 try:
     from .assistant_service import run_assistant_turn
     from .faster_whisper_stt import TranscriptionResult, transcribe_audio_file
+    from .logging_utils import log_kv
     from .session_control import (
         AudioSessionDirective,
         DeviceAudioSessionState,
@@ -28,6 +30,7 @@ try:
 except ImportError:
     from assistant_service import run_assistant_turn
     from faster_whisper_stt import TranscriptionResult, transcribe_audio_file
+    from logging_utils import log_kv
     from session_control import (
         AudioSessionDirective,
         DeviceAudioSessionState,
@@ -43,9 +46,15 @@ DEFAULT_CHANNELS = 1
 DEFAULT_PORT = 81
 DEFAULT_TIMEOUT_SECONDS = 5.0
 DEFAULT_RETRY_SECONDS = 1.0
+DEFAULT_NO_SPEECH_TIMEOUT_SECONDS = 10.0
 DEFAULT_OUTPUT_DIR = Path(__file__).resolve().parent / "recordings"
 DEFAULT_WS_PATH = "/"
 DEFAULT_CONTROL_SIGNAL_SETTLE_SECONDS = 0.05
+DEFAULT_WS_RECV_POLL_SECONDS = 0.2
+DEFAULT_CAPTURE_STATS_INTERVAL_SECONDS = 2.0
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -181,7 +190,7 @@ class WavSegmentSink:
         self.last_path = path
         self.writer = StreamingWavWriter(path, self.audio_format)
         self.current_frames = 0
-        print(f"writing {path}", flush=True)
+        log_kv(logger, logging.INFO, "capture_file_opened", path=path)
 
     def _close_writer(self) -> None:
         if self.writer is None:
@@ -271,9 +280,12 @@ class CaptureRequest:
     enable_first_utterance_vad: bool = True
     first_utterance_state: DeviceAudioSessionState = DeviceAudioSessionState.WAIT_WAKEWORD
     stop_after_first_utterance: bool | None = None
+    no_speech_timeout_seconds: float | None = DEFAULT_NO_SPEECH_TIMEOUT_SECONDS
+    public_base_url: str | None = None
     nfc_tag_id: str | None = None
     user_id: str | None = None
     device_id: str | None = None
+    capture_token: str | None = None
 
     def websocket_url(self) -> str:
         path = self.ws_path if self.ws_path.startswith("/") else f"/{self.ws_path}"
@@ -290,6 +302,7 @@ class CaptureStatus:
     session_id: str
     state: str = "idle"
     ws_url: str = ""
+    capture_token: str | None = None
     started_at: str | None = None
     stopped_at: str | None = None
     packet_count: int = 0
@@ -320,6 +333,10 @@ class FirstUtteranceProcessingError(RuntimeError):
     pass
 
 
+class CaptureStoppedError(FirstUtteranceProcessingError):
+    pass
+
+
 class CaptureSession:
     def __init__(self, request: CaptureRequest) -> None:
         self.request = request
@@ -335,6 +352,7 @@ class CaptureSession:
             session_id=datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ"),
             state="starting",
             ws_url=request.websocket_url(),
+            capture_token=request.capture_token,
             started_at=datetime.now(timezone.utc).isoformat(),
             output_dir=str(request.output_dir),
         )
@@ -356,6 +374,13 @@ class CaptureSession:
             for key, value in changes.items():
                 setattr(self.status, key, value)
 
+    def _stop_requested(self) -> bool:
+        return self.stop_event.is_set()
+
+    def _ensure_not_stopped(self, message: str = "capture stopped") -> None:
+        if self._stop_requested():
+            raise CaptureStoppedError(message)
+
     def _save_first_utterance(self, segment: SpeechSegment) -> Path:
         path = self.request.output_dir / "utterances" / (
             f"{self.request.prefix}_{self.status.session_id}_first_utterance.wav"
@@ -376,6 +401,17 @@ class CaptureSession:
         ws: websocket.WebSocket,
         directive: AudioSessionDirective,
     ) -> None:
+        log_kv(
+            logger,
+            logging.INFO,
+            "device_state_sending",
+            session_id=self.status.session_id,
+            ws_url=self.request.websocket_url(),
+            state=directive.state.value,
+            reason=directive.reason,
+            stop_capture=directive.stop_capture,
+            capture_token=directive.capture_token,
+        )
         self._update_status(
             device_state_signal=directive.state.value,
             device_state_signal_reason=directive.reason,
@@ -393,6 +429,18 @@ class CaptureSession:
         self._update_status(device_state_signal_sent_at=datetime.now(timezone.utc).isoformat())
 
     def _send_json_message(self, ws: websocket.WebSocket, payload: dict[str, object]) -> None:
+        log_kv(
+            logger,
+            logging.INFO,
+            "device_payload_sending",
+            session_id=self.status.session_id,
+            ws_url=self.request.websocket_url(),
+            payload_type=payload.get("type"),
+            capture_token=payload.get("capture_token"),
+            tts_url=payload.get("tts_url"),
+            media_url=payload.get("media_url"),
+            final_state=payload.get("final_state"),
+        )
         try:
             ws.send(json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
         except websocket.WebSocketException as exc:
@@ -405,6 +453,8 @@ class CaptureSession:
             "user_id": self.request.user_id or "",
             "nfc_tag_id": self.request.nfc_tag_id or "",
             "device_id": self.request.device_id or self.request.ws_host,
+            "capture_token": self.request.capture_token or "",
+            "public_base_url": self.request.public_base_url or "",
             "text_input": transcription.text,
             "stt_text": transcription.text,
         }
@@ -417,20 +467,70 @@ class CaptureSession:
                 f"failed to process assistant turn: {exc}"
             ) from exc
 
-    def _send_return_to_wait_wakeword(
+    def _send_terminal_state(
         self,
         ws: websocket.WebSocket,
+        state: DeviceAudioSessionState,
         reason: str,
     ) -> None:
         self._send_audio_session_directive(
             ws,
             AudioSessionDirective(
-                state=DeviceAudioSessionState.WAIT_WAKEWORD,
+                state=state,
                 reason=reason,
                 stop_capture=True,
+                capture_token=self.request.capture_token,
             ),
         )
         time.sleep(DEFAULT_CONTROL_SIGNAL_SETTLE_SECONDS)
+
+    def _maybe_finalize_pending_utterance(self, ws: websocket.WebSocket) -> bool:
+        detector = self.first_utterance_detector
+        config = self.first_utterance_config
+        if detector is None or config is None:
+            return False
+
+        segment = detector.finalize_pending_if_idle(config.final_pause_ms / 1000.0)
+        if segment is None:
+            return False
+
+        log_kv(
+            logger,
+            logging.INFO,
+            "capture_pending_speech_flushed",
+            session_id=self.status.session_id,
+            capture_token=self.request.capture_token,
+            completion_reason=segment.completion_reason,
+            duration_seconds=round(segment.duration_seconds, 3),
+            speech_blocks=segment.speech_block_count,
+        )
+        return self._handle_first_utterance(ws, segment)
+
+    def _maybe_handle_no_speech_timeout(self, ws: websocket.WebSocket) -> bool:
+        detector = self.first_utterance_detector
+        if detector is None or detector.has_pending_utterance():
+            return False
+        if (
+            self.request.no_speech_timeout_seconds is None
+            or not detector.idle_timeout_reached(self.request.no_speech_timeout_seconds)
+        ):
+            return False
+
+        log_kv(
+            logger,
+            logging.INFO,
+            "capture_no_speech_timeout",
+            session_id=self.status.session_id,
+            timeout_seconds=self.request.no_speech_timeout_seconds,
+            capture_token=self.request.capture_token,
+        )
+        self._send_terminal_state(
+            ws,
+            DeviceAudioSessionState.WAIT_WAKEWORD,
+            "no_speech_timeout",
+        )
+        self._update_status(state="completed")
+        return True
 
     def _handle_first_utterance(self, ws: websocket.WebSocket, segment: SpeechSegment) -> bool:
         detected_at = datetime.now(timezone.utc).isoformat()
@@ -438,6 +538,7 @@ class CaptureSession:
             state=self.request.first_utterance_state,
             reason="first_utterance_detected",
             stop_capture=False,
+            capture_token=self.request.capture_token,
         )
 
         try:
@@ -460,24 +561,33 @@ class CaptureSession:
             self._send_audio_session_directive(ws, directive)
             initial_signal_sent = True
             time.sleep(DEFAULT_CONTROL_SIGNAL_SETTLE_SECONDS)
+            self._ensure_not_stopped("capture stopped before transcription")
             transcription = self._transcribe_first_utterance(utterance_path)
+        except CaptureStoppedError:
+            raise
         except FirstUtteranceProcessingError:
             if initial_signal_sent:
                 try:
-                    self._send_return_to_wait_wakeword(ws, "first_utterance_processing_failed")
+                    self._send_terminal_state(
+                        ws,
+                        DeviceAudioSessionState.STREAMING,
+                        "first_utterance_processing_failed",
+                    )
                 except FirstUtteranceProcessingError:
                     pass
             raise
 
         transcript_text = transcription.text or ""
         transcript_display = transcript_text if transcript_text else "<empty>"
-        if transcription.language:
-            print(
-                f"user said [{transcription.language}]: {transcript_display}",
-                flush=True,
-            )
-        else:
-            print(f"user said: {transcript_display}", flush=True)
+        log_kv(
+            logger,
+            logging.INFO,
+            "first_utterance_transcribed",
+            session_id=self.status.session_id,
+            capture_token=self.request.capture_token,
+            language=transcription.language,
+            transcript=transcript_display,
+        )
 
         self._update_status(
             first_utterance_transcript=transcript_text or None,
@@ -485,19 +595,28 @@ class CaptureSession:
         )
 
         if not transcript_text:
-            self._send_return_to_wait_wakeword(ws, "empty_transcript")
+            self._send_terminal_state(ws, DeviceAudioSessionState.STREAMING, "empty_transcript")
             self._update_status(state="completed")
             return True
 
         try:
+            self._ensure_not_stopped("capture stopped before assistant turn")
             assistant_turn = self._run_assistant_turn(transcription)
+        except CaptureStoppedError:
+            raise
         except FirstUtteranceProcessingError:
             if initial_signal_sent:
                 try:
-                    self._send_return_to_wait_wakeword(ws, "assistant_turn_failed")
+                    self._send_terminal_state(
+                        ws,
+                        DeviceAudioSessionState.STREAMING,
+                        "assistant_turn_failed",
+                    )
                 except FirstUtteranceProcessingError:
                     pass
             raise
+
+        self._ensure_not_stopped("capture stopped before dispatching assistant response")
 
         playback = assistant_turn.get("playback", {}) if isinstance(assistant_turn.get("playback"), dict) else {}
         tts_playback = playback.get("tts", {}) if isinstance(playback.get("tts"), dict) else {}
@@ -530,17 +649,38 @@ class CaptureSession:
                 else []
             ),
         )
+        log_kv(
+            logger,
+            logging.INFO,
+            "assistant_turn_ready_for_device",
+            session_id=self.status.session_id,
+            capture_token=self.request.capture_token,
+            assistant_status=assistant_turn.get("status"),
+            route_group=((assistant_turn.get("route") or {}) if isinstance(assistant_turn.get("route"), dict) else {}).get("group"),
+            tts_url=tts_playback.get("url"),
+            media_url=media_playback.get("stream_url"),
+            esp_message_count=len(esp_messages),
+        )
 
         if esp_messages:
             for message in esp_messages:
                 if not isinstance(message, dict):
                     continue
+                self._ensure_not_stopped("capture stopped while dispatching assistant response")
                 self._send_json_message(ws, message)
                 time.sleep(DEFAULT_CONTROL_SIGNAL_SETTLE_SECONDS)
             if not has_playback_message:
-                self._send_return_to_wait_wakeword(ws, "assistant_commands_dispatched")
+                self._send_terminal_state(
+                    ws,
+                    DeviceAudioSessionState.STREAMING,
+                    "assistant_commands_dispatched",
+                )
         else:
-            self._send_return_to_wait_wakeword(ws, "assistant_response_without_playback")
+            self._send_terminal_state(
+                ws,
+                DeviceAudioSessionState.STREAMING,
+                "assistant_response_without_playback",
+            )
 
         self._update_status(state="completed")
         return True
@@ -554,6 +694,10 @@ class CaptureSession:
                 segment_seconds=self.request.segment_seconds,
             )
             last_seq: int | None = None
+            started_monotonic = time.monotonic()
+            last_stats_monotonic = started_monotonic
+            last_stats_packet_count = 0
+            last_stats_total_frames = 0
             ws: websocket.WebSocket | None = None
             self.first_utterance_detector = (
                 FirstUtteranceDetector(self.first_utterance_config)
@@ -562,40 +706,110 @@ class CaptureSession:
             )
 
             try:
-                print(f"connecting to {self.request.websocket_url()}", flush=True)
+                log_kv(
+                    logger,
+                    logging.INFO,
+                    "capture_connecting",
+                    session_id=self.status.session_id,
+                    ws_url=self.request.websocket_url(),
+                    capture_token=self.request.capture_token,
+                    public_base_url=self.request.public_base_url,
+                )
                 self._update_status(state="connecting", error=None)
                 ws = websocket.create_connection(
                     self.request.websocket_url(),
                     timeout=self.request.timeout_seconds,
                 )
-                ws.settimeout(self.request.timeout_seconds)
-                print(f"websocket connected {self.request.websocket_url()}", flush=True)
+                recv_poll_seconds = self.request.timeout_seconds
+                if recv_poll_seconds <= 0 or recv_poll_seconds > DEFAULT_WS_RECV_POLL_SECONDS:
+                    recv_poll_seconds = DEFAULT_WS_RECV_POLL_SECONDS
+                ws.settimeout(recv_poll_seconds)
+                log_kv(
+                    logger,
+                    logging.INFO,
+                    "capture_connected",
+                    session_id=self.status.session_id,
+                    ws_url=self.request.websocket_url(),
+                    capture_token=self.request.capture_token,
+                )
                 self._update_status(state="running")
 
                 while not self.stop_event.is_set():
                     try:
                         message = ws.recv()
                     except websocket.WebSocketTimeoutException:
+                        if self._maybe_finalize_pending_utterance(ws):
+                            break
+                        if self._maybe_handle_no_speech_timeout(ws):
+                            break
                         continue
 
                     if isinstance(message, str):
                         continue
 
                     seq, pcm_bytes = parse_audio_packet(bytes(message), self.audio_format)
+                    if last_seq is not None:
+                        expected_seq = (last_seq + 1) & 0xFFFFFFFF
+                        if seq != expected_seq:
+                            lost_packets = (seq - expected_seq) & 0xFFFFFFFF
+                            log_kv(
+                                logger,
+                                logging.WARNING,
+                                "capture_sequence_gap",
+                                session_id=self.status.session_id,
+                                capture_token=self.request.capture_token,
+                                expected_sequence=expected_seq,
+                                actual_sequence=seq,
+                                lost_packets=lost_packets,
+                            )
                     last_seq = seq
                     sink.write(pcm_bytes)
 
+                    next_packet_count = self.status.packet_count + 1
                     self._update_status(
-                        packet_count=self.status.packet_count + 1,
+                        packet_count=next_packet_count,
                         total_frames=sink.total_frames,
                         last_sequence=last_seq,
                         last_file_path=str(sink.last_path) if sink.last_path else None,
                     )
 
+                    now_monotonic = time.monotonic()
+                    if now_monotonic - last_stats_monotonic >= DEFAULT_CAPTURE_STATS_INTERVAL_SECONDS:
+                        stats_interval_seconds = now_monotonic - last_stats_monotonic
+                        stats_packets = next_packet_count - last_stats_packet_count
+                        stats_frames = sink.total_frames - last_stats_total_frames
+                        audio_seconds = stats_frames / self.audio_format.sample_rate
+                        realtime_ratio = (
+                            audio_seconds / stats_interval_seconds
+                            if stats_interval_seconds > 0
+                            else 0.0
+                        )
+                        stats_level = logging.WARNING if realtime_ratio < 0.75 else logging.INFO
+                        log_kv(
+                            logger,
+                            stats_level,
+                            "capture_stream_stats",
+                            session_id=self.status.session_id,
+                            capture_token=self.request.capture_token,
+                            interval_seconds=round(stats_interval_seconds, 3),
+                            packets=stats_packets,
+                            audio_seconds=round(audio_seconds, 3),
+                            realtime_ratio=round(realtime_ratio, 3),
+                            total_packets=next_packet_count,
+                            total_frames=sink.total_frames,
+                        )
+                        last_stats_monotonic = now_monotonic
+                        last_stats_packet_count = next_packet_count
+                        last_stats_total_frames = sink.total_frames
+
                     if self.first_utterance_detector is None:
                         continue
 
                     segment = self.first_utterance_detector.process_pcm_bytes(pcm_bytes)
+                    if segment is None and self._maybe_finalize_pending_utterance(ws):
+                        break
+                    if segment is None and self._maybe_handle_no_speech_timeout(ws):
+                        break
                     if segment is None:
                         continue
 
@@ -603,11 +817,29 @@ class CaptureSession:
                         break
 
             except FirstUtteranceProcessingError as exc:
-                print(f"first utterance processing error {self.request.websocket_url()}: {exc}", flush=True)
+                if self._stop_requested():
+                    self._update_status(state="stopped", error=None)
+                    break
+                log_kv(
+                    logger,
+                    logging.ERROR,
+                    "capture_processing_error",
+                    session_id=self.status.session_id,
+                    ws_url=self.request.websocket_url(),
+                    error=str(exc),
+                    capture_token=self.request.capture_token,
+                )
                 self._update_status(state="error", error=str(exc))
                 break
             except websocket.WebSocketBadStatusException as exc:
-                print(f"websocket handshake failed {self.request.websocket_url()}: {exc}", flush=True)
+                log_kv(
+                    logger,
+                    logging.ERROR,
+                    "capture_websocket_handshake_failed",
+                    session_id=self.status.session_id,
+                    ws_url=self.request.websocket_url(),
+                    error=str(exc),
+                )
                 self._update_status(state="error", error=f"websocket handshake failed: {exc}")
                 break
             except websocket.WebSocketConnectionClosedException:
@@ -617,9 +849,23 @@ class CaptureSession:
                 if self.request.retry_seconds is None:
                     self._update_status(state="stopped", error="stream ended: peer closed the websocket")
                     break
-                print("websocket peer closed connection, retrying", flush=True)
+                log_kv(
+                    logger,
+                    logging.WARNING,
+                    "capture_websocket_closed_retrying",
+                    session_id=self.status.session_id,
+                    ws_url=self.request.websocket_url(),
+                )
             except (OSError, ValueError, OverflowError, websocket.WebSocketException) as exc:
-                print(f"websocket capture error {self.request.websocket_url()}: {exc}", flush=True)
+                log_kv(
+                    logger,
+                    logging.ERROR,
+                    "capture_websocket_error",
+                    session_id=self.status.session_id,
+                    ws_url=self.request.websocket_url(),
+                    error=str(exc),
+                    capture_token=self.request.capture_token,
+                )
                 self._update_status(state="error", error=str(exc))
                 if self.request.retry_seconds is None or self.stop_event.is_set():
                     break
@@ -633,6 +879,16 @@ class CaptureSession:
                 self._update_status(
                     total_frames=sink.total_frames,
                     last_file_path=str(sink.last_path) if sink.last_path else self.status.last_file_path,
+                )
+                log_kv(
+                    logger,
+                    logging.INFO,
+                    "capture_loop_finalized",
+                    session_id=self.status.session_id,
+                    state=self.snapshot().get("state"),
+                    total_frames=sink.total_frames,
+                    last_file_path=str(sink.last_path) if sink.last_path else None,
+                    capture_token=self.request.capture_token,
                 )
 
             if self.snapshot()["state"] == "completed":
@@ -687,7 +943,7 @@ capture_manager = CaptureManager()
 def install_signal_handlers(stop: Callable[[], None]) -> None:
     def _handle_signal(signum: int, _frame: object) -> None:
         signal_name = signal.Signals(signum).name
-        print(f"received {signal_name}, closing stream", flush=True)
+        log_kv(logger, logging.INFO, "capture_signal_received", signal_name=signal_name)
         stop()
 
     for sig in (signal.SIGINT, signal.SIGTERM):
