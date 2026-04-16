@@ -19,6 +19,7 @@ enum class AudioDriverMode {
 
 constexpr TickType_t kAudioIoTimeoutTicks = pdMS_TO_TICKS(20);
 constexpr TickType_t kAmplifierSettleTicks = pdMS_TO_TICKS(20);
+constexpr int kMicrophoneGain = 6;
 
 int16_t gWsFrame[FRAME_SAMPLES] = {};
 int gWsFill = 0;
@@ -279,13 +280,12 @@ void audioReadMic(int16_t rawOut[], int &rawLen) {
         rawLen = MIC_DMA_LEN;
     }
 
-    const int gain = 2;
     for (int i = 0; i < rawLen; i++) {
         int32_t s = samples[i];
         s >>= 8;
         s += (s >= 0) ? 0x80 : -0x80;
         s >>= 8;
-        s *= gain;
+        s *= kMicrophoneGain;
 
         if (s > 32767) {
             s = 32767;

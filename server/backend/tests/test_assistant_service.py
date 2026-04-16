@@ -78,7 +78,11 @@ class AssistantServiceTests(unittest.TestCase):
     def test_run_assistant_turn_enriches_media_commands_for_device(self) -> None:
         media_record = SimpleNamespace(
             asset_id="media_456",
-            metadata={"title": "Lo-fi", "source": "youtube"},
+            metadata={
+                "title": "Lo-fi",
+                "source": "youtube",
+                "transcode_source_type": "proxy",
+            },
         )
 
         with patch.object(assistant_service.device_session_store, "get", return_value=None), patch.object(
@@ -147,6 +151,58 @@ class AssistantServiceTests(unittest.TestCase):
         self.assertEqual(result["esp_messages"][1]["type"], "assistant_playback")
         self.assertEqual(result["esp_messages"][1]["capture_token"], "cap-2")
         self.assertEqual(result["esp_messages"][1]["final_state"], "streaming")
+
+    def test_prepare_media_command_prefers_upstream_stream_for_transcoding(self) -> None:
+        media_record = SimpleNamespace(
+            asset_id="media_upstream",
+            metadata={
+                "title": "Lo-fi",
+                "source": "youtube",
+                "transcode_source_type": "upstream",
+            },
+        )
+
+        with patch.object(
+            assistant_service.asset_registry,
+            "register_media_source",
+            return_value=media_record,
+        ) as register_media_source_mock, patch.object(
+            assistant_service.asset_registry,
+            "build_media_url",
+            return_value="http://192.168.1.8:8387/api/assets/media/media_upstream.wav",
+        ):
+            normalized, playback = assistant_service._prepare_media_command(
+                {
+                    "type": "audio_stream",
+                    "proxy_url": "http://localhost:8387/api/media/youtube/stream?video_id=abc&mode=audio",
+                    "stream_url": "http://localhost:8387/api/media/youtube/stream?video_id=abc&mode=audio",
+                    "upstream_stream_url": "https://rr1---sn.example.googlevideo.com/videoplayback?id=abc",
+                    "title": "Lo-fi",
+                    "source": "youtube",
+                },
+                public_base_url="http://192.168.1.8:8387",
+            )
+
+        self.assertIsNotNone(normalized)
+        self.assertIsNotNone(playback)
+        register_media_source_mock.assert_called_once()
+        self.assertEqual(
+            register_media_source_mock.call_args.args[0],
+            "https://rr1---sn.example.googlevideo.com/videoplayback?id=abc",
+        )
+        self.assertEqual(
+            register_media_source_mock.call_args.kwargs["metadata"]["transcode_source_type"],
+            "upstream",
+        )
+        self.assertEqual(
+            register_media_source_mock.call_args.kwargs["metadata"]["proxy_source_url"],
+            "http://localhost:8387/api/media/youtube/stream?video_id=abc&mode=audio",
+        )
+        self.assertEqual(playback["transcode_source_type"], "upstream")
+        self.assertEqual(
+            playback["transcode_source_url"],
+            "https://rr1---sn.example.googlevideo.com/videoplayback?id=abc",
+        )
 
     def test_run_assistant_turn_passes_public_base_url_to_asset_registry(self) -> None:
         with patch.object(assistant_service.device_session_store, "get", return_value=None), patch.object(

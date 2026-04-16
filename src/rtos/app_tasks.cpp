@@ -53,6 +53,8 @@ constexpr unsigned long kGreetingDurationMs = 3000;
 constexpr int kNoPendingExternalAudioSessionState = -1;
 constexpr uint16_t kPlaybackHttpConnectTimeoutMs = 2500;
 constexpr uint16_t kPlaybackHttpReadTimeoutMs = 15000;
+constexpr uint16_t kPlaybackStreamStartTimeoutMs = 8000;
+constexpr uint16_t kPlaybackStreamDisconnectGraceMs = 750;
 constexpr size_t kPlaybackReadChunkBytes = 1024;
 constexpr unsigned long kPlaybackWifiReadyWaitMs = 1500;
 
@@ -692,6 +694,10 @@ bool readWavHeader(Stream &stream,
                 return false;
             }
 
+            Serial.printf("playback: wav fmt channels=%u rate=%lu bits=%u\n",
+                          info.channels,
+                          static_cast<unsigned long>(info.sampleRate),
+                          info.bitsPerSample);
             return true;
         } else {
             if (!skipStreamBytes(stream, chunkSize, request)) {
@@ -742,40 +748,302 @@ void writePlaybackChunk(const uint8_t *pcmBytes,
     storePlaybackAudio(gPlaybackPreviewSamples, previewCount);
 }
 
-bool playWavStream(HTTPClient &http, const AssistantPlaybackRequest &request) {
-    const int code = http.GET();
-    if (code != HTTP_CODE_OK) {
-        if (code < 0) {
-            Serial.printf("playback: request failed %s (%d)\n",
-                          HTTPClient::errorToString(code).c_str(),
-                          code);
-        } else {
-            Serial.printf("playback: HTTP %d\n", code);
+class WavPlaybackSink : public Stream {
+public:
+    explicit WavPlaybackSink(const AssistantPlaybackRequest &request)
+        : mRequest(request) {}
+
+    using Print::write;
+
+    int available() override {
+        return 0;
+    }
+
+    int read() override {
+        return -1;
+    }
+
+    int peek() override {
+        return -1;
+    }
+
+    void flush() override {
+        finish();
+    }
+
+    size_t write(uint8_t value) override {
+        return write(&value, 1);
+    }
+
+    size_t write(const uint8_t *buffer, size_t size) override {
+        if (buffer == nullptr || size == 0) {
+            return 0;
         }
-        return false;
+
+        size_t offset = 0;
+        while (offset < size) {
+            if (mCanceled || mError) {
+                return offset;
+            }
+            if (shouldCancelPlayback(mRequest)) {
+                mCanceled = true;
+                return offset;
+            }
+
+            switch (mState) {
+                case State::RiffHeader:
+                    offset += appendPending(buffer + offset, size - offset, 12);
+                    if (mPendingLen == 12) {
+                        if (memcmp(mPending, "RIFF", 4) != 0 ||
+                            memcmp(mPending + 8, "WAVE", 4) != 0) {
+                            setError("unsupported WAV header");
+                            return offset;
+                        }
+                        mPendingLen = 0;
+                        mState = State::ChunkHeader;
+                    }
+                    break;
+
+                case State::ChunkHeader:
+                    offset += appendPending(buffer + offset, size - offset, 8);
+                    if (mPendingLen == 8) {
+                        memcpy(mChunkId, mPending, sizeof(mChunkId));
+                        mChunkSize = readLe32(mPending + 4);
+                        mChunkHasPad = (mChunkSize % 2U) != 0U;
+                        mPendingLen = 0;
+
+                        if (memcmp(mChunkId, "fmt ", 4) == 0) {
+                            if (mChunkSize < 16U) {
+                                setError("invalid fmt chunk");
+                                return offset;
+                            }
+                            mState = State::FmtBody;
+                        } else if (memcmp(mChunkId, "data", 4) == 0) {
+                            if (!mHaveFormat) {
+                                setError("missing fmt before data");
+                                return offset;
+                            }
+                            mSawDataChunk = true;
+                            mDataHasKnownLength = mChunkSize != 0xFFFFFFFFU;
+                            mDataBytesRemaining = mChunkSize;
+                            Serial.printf("playback: wav fmt channels=%u rate=%lu bits=%u\n",
+                                          mInfo.channels,
+                                          static_cast<unsigned long>(mInfo.sampleRate),
+                                          mInfo.bitsPerSample);
+                            mState = State::Data;
+                        } else {
+                            mSkipBytesRemaining =
+                                static_cast<size_t>(mChunkSize) + (mChunkHasPad ? 1U : 0U);
+                            mState = State::SkipBytes;
+                        }
+                    }
+                    break;
+
+                case State::FmtBody:
+                    offset += appendPending(buffer + offset, size - offset, 16);
+                    if (mPendingLen == 16) {
+                        mInfo.audioFormat = readLe16(mPending + 0);
+                        mInfo.channels = readLe16(mPending + 2);
+                        mInfo.sampleRate = readLe32(mPending + 4);
+                        mInfo.bitsPerSample = readLe16(mPending + 14);
+                        mPendingLen = 0;
+
+                        if (mInfo.audioFormat != 1 || mInfo.bitsPerSample != 16 ||
+                            (mInfo.channels != 1 && mInfo.channels != 2) ||
+                            mInfo.sampleRate != static_cast<uint32_t>(SPK_SAMPLE_RATE)) {
+                            char bufferMsg[96] = {};
+                            snprintf(bufferMsg,
+                                     sizeof(bufferMsg),
+                                     "unsupported format=%u channels=%u rate=%lu bits=%u",
+                                     mInfo.audioFormat,
+                                     mInfo.channels,
+                                     static_cast<unsigned long>(mInfo.sampleRate),
+                                     mInfo.bitsPerSample);
+                            setError(bufferMsg);
+                            return offset;
+                        }
+
+                        mHaveFormat = true;
+                        mSkipBytesRemaining =
+                            static_cast<size_t>(mChunkSize - 16U) + (mChunkHasPad ? 1U : 0U);
+                        mState =
+                            mSkipBytesRemaining > 0 ? State::SkipBytes : State::ChunkHeader;
+                    }
+                    break;
+
+                case State::SkipBytes: {
+                    const size_t skipBytes =
+                        (size - offset) < mSkipBytesRemaining ? (size - offset) : mSkipBytesRemaining;
+                    offset += skipBytes;
+                    mSkipBytesRemaining -= skipBytes;
+                    if (mSkipBytesRemaining == 0) {
+                        mState = State::ChunkHeader;
+                    }
+                    break;
+                }
+
+                case State::Data: {
+                    size_t consumable = size - offset;
+                    if (mDataHasKnownLength &&
+                        consumable > static_cast<size_t>(mDataBytesRemaining)) {
+                        consumable = static_cast<size_t>(mDataBytesRemaining);
+                    }
+
+                    if (consumable == 0) {
+                        if (mDataHasKnownLength && mDataBytesRemaining == 0) {
+                            mSkipBytesRemaining = mChunkHasPad ? 1U : 0U;
+                            mState =
+                                mSkipBytesRemaining > 0 ? State::SkipBytes : State::ChunkHeader;
+                            continue;
+                        }
+                        return offset;
+                    }
+
+                    consumePcmBytes(buffer + offset, consumable);
+                    offset += consumable;
+                    mSawPayloadData = true;
+
+                    if (mDataHasKnownLength) {
+                        mDataBytesRemaining -= static_cast<uint32_t>(consumable);
+                        if (mDataBytesRemaining == 0) {
+                            mSkipBytesRemaining = mChunkHasPad ? 1U : 0U;
+                            mState =
+                                mSkipBytesRemaining > 0 ? State::SkipBytes : State::ChunkHeader;
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+
+        return size;
     }
 
-    Stream *stream = http.getStreamPtr();
-    if (stream == nullptr) {
-        Serial.println("playback: missing response stream");
-        return false;
+    bool finish() {
+        if (mFinished) {
+            return !mError && !mCanceled && mSawDataChunk && mSawPayloadData;
+        }
+
+        mFinished = true;
+        flushPlayablePcm();
+
+        if (mCanceled) {
+            return false;
+        }
+        if (!mSawDataChunk) {
+            setError("missing WAV data chunk");
+        } else if (!mSawPayloadData) {
+            setError("WAV payload empty");
+        }
+
+        return !mError;
     }
 
+    const char *errorMessage() const {
+        return mErrorMessage[0] != '\0' ? mErrorMessage : "unknown playback error";
+    }
+
+private:
+    enum class State {
+        RiffHeader,
+        ChunkHeader,
+        FmtBody,
+        SkipBytes,
+        Data,
+    };
+
+    size_t appendPending(const uint8_t *buffer, size_t availableBytes, size_t targetBytes) {
+        const size_t neededBytes = targetBytes - mPendingLen;
+        const size_t copyBytes = availableBytes < neededBytes ? availableBytes : neededBytes;
+        memcpy(mPending + mPendingLen, buffer, copyBytes);
+        mPendingLen += copyBytes;
+        return copyBytes;
+    }
+
+    void setError(const char *message) {
+        if (mError) {
+            return;
+        }
+
+        mError = true;
+        copyText(mErrorMessage, sizeof(mErrorMessage), message);
+        Serial.printf("playback: %s\n", mErrorMessage);
+    }
+
+    void consumePcmBytes(const uint8_t *buffer, size_t size) {
+        size_t offset = 0;
+        while (offset < size) {
+            const size_t writable =
+                (sizeof(mPcmBuffer) - mPcmBufferLen) < (size - offset)
+                    ? (sizeof(mPcmBuffer) - mPcmBufferLen)
+                    : (size - offset);
+            memcpy(mPcmBuffer + mPcmBufferLen, buffer + offset, writable);
+            mPcmBufferLen += writable;
+            offset += writable;
+            flushPlayablePcm();
+        }
+    }
+
+    void flushPlayablePcm() {
+        const size_t frameBytes = static_cast<size_t>(mInfo.channels) * sizeof(int16_t);
+        if (frameBytes == 0 || mPcmBufferLen < frameBytes) {
+            return;
+        }
+
+        const size_t playableBytes = (mPcmBufferLen / frameBytes) * frameBytes;
+        if (playableBytes == 0) {
+            return;
+        }
+
+        writePlaybackChunk(mPcmBuffer, playableBytes, mInfo);
+        const size_t remainingBytes = mPcmBufferLen - playableBytes;
+        if (remainingBytes > 0) {
+            memmove(mPcmBuffer, mPcmBuffer + playableBytes, remainingBytes);
+        }
+        mPcmBufferLen = remainingBytes;
+    }
+
+    const AssistantPlaybackRequest &mRequest;
+    State mState = State::RiffHeader;
+    WavStreamInfo mInfo = {};
+    uint8_t mPending[16] = {};
+    size_t mPendingLen = 0;
+    uint8_t mChunkId[4] = {};
+    uint32_t mChunkSize = 0;
+    bool mChunkHasPad = false;
+    bool mHaveFormat = false;
+    bool mSawDataChunk = false;
+    bool mSawPayloadData = false;
+    bool mDataHasKnownLength = false;
+    uint32_t mDataBytesRemaining = 0;
+    size_t mSkipBytesRemaining = 0;
+    uint8_t mPcmBuffer[kPlaybackReadChunkBytes + 4] = {};
+    size_t mPcmBufferLen = 0;
+    bool mCanceled = false;
+    bool mError = false;
+    bool mFinished = false;
+    char mErrorMessage[96] = {};
+};
+
+bool playIdentityWavStream(Stream &stream,
+                           HTTPClient &http,
+                           const AssistantPlaybackRequest &request) {
     WavStreamInfo info = {};
-    if (!readWavHeader(*stream, request, info)) {
+    if (!readWavHeader(stream, request, info)) {
         return false;
     }
 
     size_t remainderLen = 0;
     const size_t frameBytes = static_cast<size_t>(info.channels) * sizeof(int16_t);
     unsigned long lastDataMs = millis();
+    bool sawPayloadData = false;
 
-    while (http.connected() || stream->available() > 0) {
+    while (http.connected() || stream.available() > 0) {
         if (shouldCancelPlayback(request)) {
             return false;
         }
 
-        const int availableBytes = stream->available();
+        const int availableBytes = stream.available();
         if (availableBytes <= 0) {
             if (millis() - lastDataMs >= kPlaybackHttpReadTimeoutMs) {
                 break;
@@ -791,7 +1059,7 @@ bool playWavStream(HTTPClient &http, const AssistantPlaybackRequest &request) {
                 : kPlaybackReadChunkBytes;
 
         memcpy(gPlaybackCombined, gPlaybackRemainder, remainderLen);
-        const size_t readBytes = stream->readBytes(
+        const size_t readBytes = stream.readBytes(
             reinterpret_cast<char *>(gPlaybackCombined + remainderLen),
             payloadBytes);
         if (readBytes == 0) {
@@ -799,6 +1067,7 @@ bool playWavStream(HTTPClient &http, const AssistantPlaybackRequest &request) {
             continue;
         }
 
+        sawPayloadData = true;
         lastDataMs = millis();
         const size_t totalBytes = remainderLen + readBytes;
         const size_t playableBytes = (totalBytes / frameBytes) * frameBytes;
@@ -814,6 +1083,55 @@ bool playWavStream(HTTPClient &http, const AssistantPlaybackRequest &request) {
 
     if (remainderLen > 0) {
         writePlaybackChunk(gPlaybackRemainder, remainderLen - (remainderLen % frameBytes), info);
+    }
+
+    if (!sawPayloadData) {
+        Serial.println("playback: identity WAV stream ended before payload data arrived");
+        return false;
+    }
+
+    return !shouldCancelPlayback(request);
+}
+
+bool playWavStream(HTTPClient &http, const AssistantPlaybackRequest &request) {
+    const int code = http.GET();
+    if (code != HTTP_CODE_OK) {
+        if (code < 0) {
+            Serial.printf("playback: request failed %s (%d)\n",
+                          HTTPClient::errorToString(code).c_str(),
+                          code);
+        } else {
+            Serial.printf("playback: HTTP %d\n", code);
+        }
+        return false;
+    }
+
+    if (http.getSize() > 0) {
+        Stream *stream = http.getStreamPtr();
+        if (stream == nullptr) {
+            Serial.println("playback: missing identity response stream");
+            return false;
+        }
+
+        Serial.printf("playback: using identity stream path size=%d\n", http.getSize());
+        return playIdentityWavStream(*stream, http, request);
+    }
+
+    WavPlaybackSink sink(request);
+    Serial.println("playback: using chunked/unknown-length stream path");
+    const int writtenBytes = http.writeToStream(&sink);
+    const bool finished = sink.finish();
+
+    if (writtenBytes < 0) {
+        Serial.printf("playback: stream transfer failed %s (%d)\n",
+                      HTTPClient::errorToString(writtenBytes).c_str(),
+                      writtenBytes);
+        return false;
+    }
+
+    if (!finished) {
+        Serial.printf("playback: sink failed %s\n", sink.errorMessage());
+        return false;
     }
 
     return !shouldCancelPlayback(request);
@@ -867,14 +1185,30 @@ bool playWavUrl(const char *url, const AssistantPlaybackRequest &request) {
 }
 
 bool runAssistantPlayback(const AssistantPlaybackRequest &request) {
+    bool ttsOk = true;
+    bool mediaOk = true;
+
     if (request.ttsUrl[0] != '\0') {
-        playWavUrl(request.ttsUrl, request);
+        Serial.printf("playback: starting tts url=%s\n", request.ttsUrl);
+        ttsOk = playWavUrl(request.ttsUrl, request);
+        Serial.printf("playback: tts %s\n", ttsOk ? "completed" : "failed");
     }
     if (!shouldCancelPlayback(request) && request.mediaUrl[0] != '\0') {
-        playWavUrl(request.mediaUrl, request);
+        Serial.printf("playback: starting media title=%s url=%s\n",
+                      request.mediaTitle[0] != '\0' ? request.mediaTitle : "<untitled>",
+                      request.mediaUrl);
+        mediaOk = playWavUrl(request.mediaUrl, request);
+        Serial.printf("playback: media %s title=%s\n",
+                      mediaOk ? "completed" : "failed",
+                      request.mediaTitle[0] != '\0' ? request.mediaTitle : "<untitled>");
     }
 
     storePlaybackAudio(nullptr, 0);
+    if (!ttsOk || !mediaOk) {
+        Serial.printf("playback: stage result tts_ok=%s media_ok=%s\n",
+                      ttsOk ? "yes" : "no",
+                      mediaOk ? "yes" : "no");
+    }
     return !shouldCancelPlayback(request);
 }
 

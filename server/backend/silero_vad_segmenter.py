@@ -32,11 +32,11 @@ class SileroVadConfig:
     sample_rate: int = 16_000
     sample_width: int = 2
     model_window_samples: int = 512
-    vad_threshold: float = 0.50
+    vad_threshold: float = 0.42
     start_voiced_blocks: int = 2
     short_pause_ms: int = 224
     final_pause_ms: int = 640
-    min_speech_ms: int = 300
+    min_speech_ms: int = 224
     max_utterance_ms: int = 10_000
     preroll_ms: int = 1000
 

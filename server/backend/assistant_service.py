@@ -66,12 +66,9 @@ def _prepare_media_command(
     *,
     public_base_url: str | None,
 ) -> tuple[dict[str, Any], dict[str, Any]] | tuple[None, None]:
-    source_url = str(
-        command.get("proxy_url")
-        or command.get("stream_url")
-        or command.get("upstream_stream_url")
-        or ""
-    ).strip()
+    upstream_source_url = str(command.get("upstream_stream_url") or "").strip()
+    proxy_source_url = str(command.get("proxy_url") or command.get("stream_url") or "").strip()
+    source_url = upstream_source_url or proxy_source_url
     if not source_url:
         return None, None
 
@@ -81,6 +78,8 @@ def _prepare_media_command(
             "title": command.get("stream_name") or command.get("title") or "Media stream",
             "source": command.get("source") or "unknown",
             "content_type_hint": command.get("content_type_hint"),
+            "transcode_source_type": "upstream" if upstream_source_url else "proxy",
+            "proxy_source_url": proxy_source_url or None,
         },
     )
     transcoded_url = asset_registry.build_media_url(record.asset_id, base_url=public_base_url)
@@ -91,6 +90,8 @@ def _prepare_media_command(
         "title": record.metadata.get("title") or "Media stream",
         "source": record.metadata.get("source") or "unknown",
         "content_type": "audio/wav",
+        "transcode_source_url": source_url,
+        "transcode_source_type": record.metadata.get("transcode_source_type") or "proxy",
     }
     return {**command, "transcoded_stream_url": transcoded_url}, playback
 
@@ -207,6 +208,8 @@ def run_assistant_turn(payload: dict[str, Any]) -> dict[str, Any]:
                 asset_id=playback_info.get("asset_id"),
                 media_url=playback_info.get("stream_url"),
                 source_url=playback_info.get("source_url"),
+                transcode_source_url=playback_info.get("transcode_source_url"),
+                transcode_source_type=playback_info.get("transcode_source_type"),
                 title=playback_info.get("title"),
             )
 
