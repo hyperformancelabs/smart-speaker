@@ -14,7 +14,7 @@ try:
 except ModuleNotFoundError:
     def dotenv_values(*args, **kwargs):
         return {}
-from flask import Flask, jsonify, render_template, render_template_string, request
+from flask import Flask, jsonify, render_template, request
 from sqlalchemy import text
 from profile_schema import build_default_preferences, merge_preferences, normalize_preferences
 
@@ -30,250 +30,6 @@ DEFAULT_SERVER_PORT = 8386
 REGISTER_HOST = "register.ssproject.hyperformancelabs.click"
 ALLOWED_REPEAT_VALUES = {"once", "daily", "weekly"}
 ALLOWED_SCHEDULE_TYPES = {"time", "datetime", "relative"}
-
-REGISTER_PAGE_TEMPLATE = """
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SS Project Registration</title>
-  <style>
-    :root {
-      --bg: #f4efe7;
-      --panel: rgba(255, 252, 247, 0.92);
-      --ink: #14213d;
-      --muted: #5c677d;
-      --accent: #f77f00;
-      --accent-dark: #d96c00;
-      --line: rgba(20, 33, 61, 0.12);
-      --success: #1f7a4d;
-      --error: #a61e4d;
-      --shadow: 0 24px 60px rgba(20, 33, 61, 0.14);
-    }
-
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      font-family: "Segoe UI", "Helvetica Neue", sans-serif;
-      color: var(--ink);
-      background:
-        radial-gradient(circle at top left, rgba(247, 127, 0, 0.18), transparent 32%),
-        radial-gradient(circle at bottom right, rgba(20, 33, 61, 0.10), transparent 30%),
-        linear-gradient(135deg, #f6f1ea 0%, #efe6da 100%);
-      display: grid;
-      place-items: center;
-      padding: 24px;
-    }
-
-    .shell {
-      width: min(100%, 980px);
-      display: grid;
-      grid-template-columns: 1.05fr 0.95fr;
-      background: var(--panel);
-      border: 1px solid rgba(255, 255, 255, 0.7);
-      border-radius: 28px;
-      overflow: hidden;
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(14px);
-    }
-
-    .hero, .form-wrap { padding: 32px; }
-    .hero {
-      background:
-        linear-gradient(160deg, rgba(20, 33, 61, 0.96), rgba(34, 51, 84, 0.90)),
-        linear-gradient(120deg, #14213d, #31415f);
-      color: #fff7ed;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      gap: 24px;
-    }
-
-    .eyebrow {
-      display: inline-flex;
-      width: fit-content;
-      padding: 8px 12px;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.12);
-      font-size: 12px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-
-    h1 {
-      margin: 18px 0 12px;
-      font-size: clamp(30px, 5vw, 54px);
-      line-height: 0.96;
-      letter-spacing: -0.04em;
-    }
-
-    .hero p, .meta, .hint { color: rgba(255, 247, 237, 0.82); }
-    .meta {
-      display: grid;
-      gap: 12px;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .meta-card {
-      padding: 14px 16px;
-      border-radius: 18px;
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.10);
-    }
-
-    .meta-label {
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      opacity: 0.72;
-    }
-
-    .meta-value {
-      margin-top: 8px;
-      font-size: 15px;
-      font-weight: 600;
-      word-break: break-word;
-    }
-
-    .form-wrap {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      gap: 20px;
-    }
-
-    .form-wrap h2 {
-      margin: 0;
-      font-size: clamp(24px, 4vw, 36px);
-      letter-spacing: -0.03em;
-    }
-
-    form {
-      display: grid;
-      gap: 16px;
-    }
-
-    label {
-      display: grid;
-      gap: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--ink);
-    }
-
-    input {
-      width: 100%;
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      padding: 15px 16px;
-      font: inherit;
-      background: rgba(255, 255, 255, 0.78);
-      color: var(--ink);
-    }
-
-    input:focus {
-      outline: 2px solid rgba(247, 127, 0, 0.25);
-      border-color: rgba(247, 127, 0, 0.52);
-    }
-
-    button {
-      appearance: none;
-      border: 0;
-      border-radius: 16px;
-      padding: 16px 18px;
-      font: inherit;
-      font-weight: 700;
-      background: linear-gradient(135deg, var(--accent), #ff9f1c);
-      color: white;
-      cursor: pointer;
-      box-shadow: 0 12px 28px rgba(247, 127, 0, 0.28);
-    }
-
-    button:hover { background: linear-gradient(135deg, var(--accent-dark), var(--accent)); }
-
-    .flash {
-      padding: 14px 16px;
-      border-radius: 16px;
-      font-size: 14px;
-      line-height: 1.45;
-    }
-
-    .flash.success {
-      background: rgba(31, 122, 77, 0.10);
-      color: var(--success);
-      border: 1px solid rgba(31, 122, 77, 0.18);
-    }
-
-    .flash.error {
-      background: rgba(166, 30, 77, 0.08);
-      color: var(--error);
-      border: 1px solid rgba(166, 30, 77, 0.16);
-    }
-
-    .hint {
-      margin: 0;
-      font-size: 14px;
-      color: var(--muted);
-    }
-
-    @media (max-width: 820px) {
-      .shell { grid-template-columns: 1fr; }
-      .hero, .form-wrap { padding: 24px; }
-      .meta { grid-template-columns: 1fr; }
-    }
-  </style>
-</head>
-<body>
-  <main class="shell">
-    <section class="hero">
-      <div>
-        <span class="eyebrow">SS Project</span>
-        <h1>Finish your speaker registration.</h1>
-        <p>Complete the profile linked to your NFC card so the device can personalize your experience.</p>
-      </div>
-      <div class="meta">
-        <div class="meta-card">
-          <div class="meta-label">NFC Tag</div>
-          <div class="meta-value">{{ nfc_tag_id or "Not provided" }}</div>
-        </div>
-        <div class="meta-card">
-          <div class="meta-label">Register URL</div>
-          <div class="meta-value">{{ register_url }}</div>
-        </div>
-      </div>
-    </section>
-    <section class="form-wrap">
-      <div>
-        <h2>Create your profile</h2>
-        <p class="hint">Use letters, spaces, numbers, and underscores according to the profile rules.</p>
-      </div>
-      {% if status_message %}
-        <div class="flash {{ status_kind }}">{{ status_message }}</div>
-      {% endif %}
-      <form method="post" action="/register">
-        <input type="hidden" name="nfc_tag_id" value="{{ nfc_tag_id or '' }}">
-        <label>
-          Full name
-          <input name="name" type="text" maxlength="255" placeholder="Alex Johnson" value="{{ form_data.get('name', '') }}" required>
-        </label>
-        <label>
-          Username
-          <input name="user_name" type="text" maxlength="100" placeholder="alex_johnson" value="{{ form_data.get('user_name', '') }}" required>
-        </label>
-        <label>
-          Password
-          <input name="user_password" type="password" minlength="6" maxlength="255" placeholder="Create a secure password" required>
-        </label>
-        <button type="submit">Complete Registration</button>
-      </form>
-      <p class="hint">After saving successfully, tap your NFC card on the speaker again.</p>
-    </section>
-  </main>
-</body>
-</html>
-"""
 
 DATABASE_URL = str(ENV_VALUES.get("DATABASE_URL") or "").strip()
 if not DATABASE_URL:
@@ -372,8 +128,8 @@ def render_register_page(
     http_status: int = 200,
 ):
     return (
-        render_template_string(
-            REGISTER_PAGE_TEMPLATE,
+        render_template(
+            "register.html",
             nfc_tag_id=nfc_tag_id,
             register_url=build_register_url(nfc_tag_id),
             status_message=status_message,
@@ -671,7 +427,7 @@ def register_page_submit():
 
     return render_register_page(
         nfc_tag_id=nfc_tag_id,
-        status_message="Registration completed. Please tap your NFC card on the speaker again.",
+        status_message="Registration completed.",
         status_kind="success",
         form_data={},
         http_status=status_code,

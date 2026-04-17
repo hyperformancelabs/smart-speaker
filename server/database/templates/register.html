@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Smart Speaker Registration</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,200..1000;1,6..12,200..1000&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <link rel="stylesheet" href="/static/css/style.css" />
+    <link rel="icon" type="image/png" href="/static/image/logo.png" />
+    <style>
+      .register-flash {
+        border-left: 4px solid var(--primary);
+        padding: 1rem;
+        margin-bottom: 1rem;
+        background: #eef2ff;
+        color: var(--text-main);
+      }
+
+      .register-flash.success {
+        border-color: var(--success);
+        background: rgba(42, 157, 143, 0.12);
+      }
+
+      .register-flash.error {
+        border-color: var(--danger);
+        background: rgba(230, 57, 70, 0.1);
+      }
+
+      .register-tag {
+        margin-top: 0.75rem;
+        color: var(--text-muted);
+        font-size: 0.9rem;
+      }
+
+      .register-note {
+        margin-top: 1.25rem;
+        text-align: center;
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        line-height: 1.6;
+      }
+
+      .register-note strong {
+        color: var(--text-main);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="auth-layout">
+      <div class="glass-panel auth-card">
+        <div class="auth-header">
+          <img
+            src="/static/image/logo.png"
+            alt="Smart Speaker Logo"
+            style="width: 64px; height: 64px; margin: 0 auto 1rem; display: block; object-fit: contain;"
+          />
+          <h2>Tạo Tài Khoản</h2>
+          <p class="text-success">
+            <i class="fa-solid fa-id-card"></i>
+            Đăng ký cho thẻ NFC
+          </p>
+          {% if nfc_tag_id %}
+          <p class="register-tag">NFC Tag: {{ nfc_tag_id }}</p>
+          {% endif %}
+        </div>
+
+        {% if status_message %}
+        <div class="register-flash {{ status_kind }}">{{ status_message }}</div>
+        {% endif %}
+
+        <form method="post" action="/register" class="modern-form">
+          <input type="hidden" name="nfc_tag_id" value="{{ nfc_tag_id or '' }}" />
+
+          <div class="form-group">
+            <label for="name">Họ và tên</label>
+            <input
+              id="name"
+              name="name"
+              type="text"
+              maxlength="255"
+              placeholder="Ví dụ: Nguyễn Văn A"
+              value="{{ form_data.get('name', '') }}"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="user_name">Username</label>
+            <input
+              id="user_name"
+              name="user_name"
+              type="text"
+              maxlength="100"
+              placeholder="username"
+              value="{{ form_data.get('user_name', '') }}"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="user_password">Mật khẩu</label>
+            <input
+              id="user_password"
+              name="user_password"
+              type="password"
+              minlength="6"
+              maxlength="255"
+              placeholder="Tạo mật khẩu"
+              required
+            />
+          </div>
+
+          <button type="submit" class="btn-primary glow-effect">
+            <i class="fa-solid fa-circle-check"></i>
+            Hoàn tất đăng ký
+          </button>
+        </form>
+
+        <div class="auth-footer">
+          <a href="/" class="text-link">Quay lại dashboard</a>
+        </div>
+
+        <p class="register-note">
+          <strong>Lưu ý:</strong> Sau khi đăng ký xong, hãy chạm lại thẻ vào speaker để thiết bị nhận hồ sơ mới.
+        </p>
+      </div>
+    </div>
+  </body>
+</html>
