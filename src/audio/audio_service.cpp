@@ -146,6 +146,16 @@ AudioDriverMode currentDriverModeLocked() {
     return gDriverMode;
 }
 
+void writeOutputSamplesLocked(const int16_t samples[], size_t sampleCount) {
+    if (samples == nullptr || sampleCount == 0 ||
+        currentDriverModeLocked() != AudioDriverMode::Playback) {
+        return;
+    }
+
+    size_t bytesWritten = 0;
+    i2s_write(I2S_PORT, samples, sampleCount * sizeof(int16_t), &bytesWritten, portMAX_DELAY);
+}
+
 void setAmplifierEnabled(bool enabled) {
     digitalWrite(PIN_AMP_SD, enabled ? HIGH : LOW);
 }
@@ -203,8 +213,7 @@ void audioWriteOutputSamples(const int16_t samples[], size_t sampleCount) {
         return;
     }
 
-    size_t bytesWritten = 0;
-    i2s_write(I2S_PORT, samples, sampleCount * sizeof(int16_t), &bytesWritten, portMAX_DELAY);
+    writeOutputSamplesLocked(samples, sampleCount);
     unlockAudioMutex();
 }
 
@@ -219,7 +228,6 @@ void audioBeep(int freq, int ms) {
 
     const AudioDriverMode previousMode = currentDriverModeLocked();
     installDriverLocked(AudioDriverMode::Playback);
-    unlockAudioMutex();
     vTaskDelay(kAmplifierSettleTicks);
 
     int total = (SPK_SAMPLE_RATE * ms) / 1000;
@@ -235,15 +243,17 @@ void audioBeep(int freq, int ms) {
             buf[i * 2] = s;
             buf[i * 2 + 1] = s;
         }
-        audioWriteOutputSamples(buf, static_cast<size_t>(n) * 2U);
+        writeOutputSamplesLocked(buf, static_cast<size_t>(n) * 2U);
         total -= n;
     }
 
     vTaskDelay(pdMS_TO_TICKS(8));
 
     if (previousMode == AudioDriverMode::Capture) {
-        audioSetRouteMode(AudioRouteMode::Capture);
+        installDriverLocked(AudioDriverMode::Capture);
     }
+
+    unlockAudioMutex();
 }
 
 void audioReadMic(int16_t rawOut[], int &rawLen) {

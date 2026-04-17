@@ -22,6 +22,13 @@ This project now runs as a small FreeRTOS pipeline on ESP32 instead of doing all
 - `wakeword/ui -> beep` via a beep queue
 - Shared OLED snapshot via a mutex-protected `AppState`
 
+## Coordination
+
+- `app_runtime` owns the shared queues, app snapshot, and cross-core session flags so task code no longer edits scattered globals directly.
+- `playback_service` owns WAV parsing and HTTP audio playback so `app_tasks.cpp` stays focused on orchestration.
+- `wifi_service` serializes `WiFi` access with an internal mutex because reconnects, status checks, and HTTP-triggered waits now come from multiple tasks.
+- `audioBeep()` now keeps exclusive control of the shared I2S route for the full tone, which avoids route flapping during wakeword/NFC feedback.
+
 ## Why this layout
 
 - Audio capture is the most timing-sensitive path, so it gets the highest priority.

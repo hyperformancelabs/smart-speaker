@@ -1,8 +1,12 @@
 #include "net/wifi_service.h"
 
 #include <cstring>
+
 #include <Arduino.h>
 #include <WiFi.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
+#include <freertos/task.h>
 
 #include "app_config.h"
 #include "secrets.h"
@@ -51,8 +55,36 @@ namespace {
 unsigned long lastWifiRetryMs = 0;
 unsigned long wifiAttemptStartedMs = 0;
 bool accessPointStarted = false;
+SemaphoreHandle_t gWifiMutex = nullptr;
 
-bool wifiStartAccessPoint() {
+void ensureWifiMutex() {
+    if (gWifiMutex != nullptr) {
+        return;
+    }
+
+    gWifiMutex = xSemaphoreCreateMutex();
+}
+
+bool lockWifiMutex(TickType_t timeoutTicks = portMAX_DELAY) {
+    ensureWifiMutex();
+    return gWifiMutex != nullptr && xSemaphoreTake(gWifiMutex, timeoutTicks) == pdTRUE;
+}
+
+void unlockWifiMutex() {
+    if (gWifiMutex != nullptr) {
+        xSemaphoreGive(gWifiMutex);
+    }
+}
+
+void schedulerFriendlyDelay(unsigned long delayMs) {
+    if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
+        vTaskDelay(pdMS_TO_TICKS(delayMs));
+    } else {
+        delay(delayMs);
+    }
+}
+
+bool wifiStartAccessPointLocked() {
     const IPAddress apIp(192, 168, 4, 1);
     const IPAddress gateway(192, 168, 4, 1);
     const IPAddress subnet(255, 255, 255, 0);
@@ -68,34 +100,18 @@ bool wifiStartAccessPoint() {
     return WiFi.softAP(WIFI_AP_SSID, WIFI_AP_PASSWORD);
 }
 
-void wifiRestartStationConnection(unsigned long now) {
+void wifiRestartStationConnectionLocked(unsigned long now) {
     lastWifiRetryMs = now;
     wifiAttemptStartedMs = now;
     WiFi.disconnect();
     WiFi.begin(WIFI_STA_SSID, WIFI_STA_PASSWORD);
 }
-}
 
-void wifiConnect() {
-#if APP_WIFI_MODE == APP_WIFI_MODE_AP
-    WiFi.mode(WIFI_AP);
-    accessPointStarted = wifiStartAccessPoint();
-    lastWifiRetryMs = millis();
-#else
-    WiFi.mode(WIFI_STA);
-    WiFi.setSleep(false);
-    WiFi.setAutoReconnect(true);
-    WiFi.begin(WIFI_STA_SSID, WIFI_STA_PASSWORD);
-    wifiAttemptStartedMs = millis();
-    lastWifiRetryMs = wifiAttemptStartedMs;
-#endif
-}
-
-WifiConnectionState wifiGetConnectionState() {
+WifiConnectionState wifiGetConnectionStateLocked() {
 #if APP_WIFI_MODE == APP_WIFI_MODE_AP
     return accessPointStarted ? WifiConnectionState::Ready : WifiConnectionState::Failed;
 #else
-    wl_status_t status = WiFi.status();
+    const wl_status_t status = WiFi.status();
 
     if (status == WL_CONNECTED) {
         return WifiConnectionState::Ready;
@@ -113,33 +129,77 @@ WifiConnectionState wifiGetConnectionState() {
     return WifiConnectionState::Connecting;
 #endif
 }
+}  // namespace
+
+void wifiConnect() {
+    if (!lockWifiMutex()) {
+        return;
+    }
+
+#if APP_WIFI_MODE == APP_WIFI_MODE_AP
+    WiFi.mode(WIFI_AP);
+    accessPointStarted = wifiStartAccessPointLocked();
+    lastWifiRetryMs = millis();
+#else
+    WiFi.mode(WIFI_STA);
+    WiFi.setSleep(false);
+    WiFi.setAutoReconnect(true);
+    WiFi.begin(WIFI_STA_SSID, WIFI_STA_PASSWORD);
+    wifiAttemptStartedMs = millis();
+    lastWifiRetryMs = wifiAttemptStartedMs;
+#endif
+
+    unlockWifiMutex();
+}
+
+WifiConnectionState wifiGetConnectionState() {
+    if (!lockWifiMutex()) {
+        return WifiConnectionState::Failed;
+    }
+
+    const WifiConnectionState state = wifiGetConnectionStateLocked();
+    unlockWifiMutex();
+    return state;
+}
 
 void wifiEnsureConnected() {
+    if (!lockWifiMutex()) {
+        return;
+    }
+
 #if APP_WIFI_MODE == APP_WIFI_MODE_AP
-    if (accessPointStarted) return;
-
-    unsigned long now = millis();
-    if (now - lastWifiRetryMs < WIFI_RETRY_MS) return;
-
-    lastWifiRetryMs = now;
-    accessPointStarted = wifiStartAccessPoint();
+    if (!accessPointStarted) {
+        const unsigned long now = millis();
+        if (now - lastWifiRetryMs >= WIFI_RETRY_MS) {
+            lastWifiRetryMs = now;
+            accessPointStarted = wifiStartAccessPointLocked();
+        }
+    }
 #else
-    unsigned long now = millis();
-    if (wifiGetConnectionState() != WifiConnectionState::Failed) return;
-    if (now - lastWifiRetryMs < WIFI_RETRY_MS) return;
-
-    wifiRestartStationConnection(now);
+    const unsigned long now = millis();
+    if (wifiGetConnectionStateLocked() == WifiConnectionState::Failed &&
+        now - lastWifiRetryMs >= WIFI_RETRY_MS) {
+        wifiRestartStationConnectionLocked(now);
+    }
 #endif
+
+    unlockWifiMutex();
 }
 
 void wifiForceReconnect() {
+    if (!lockWifiMutex()) {
+        return;
+    }
+
 #if APP_WIFI_MODE == APP_WIFI_MODE_AP
     accessPointStarted = false;
     lastWifiRetryMs = millis();
-    accessPointStarted = wifiStartAccessPoint();
+    accessPointStarted = wifiStartAccessPointLocked();
 #else
-    wifiRestartStationConnection(millis());
+    wifiRestartStationConnectionLocked(millis());
 #endif
+
+    unlockWifiMutex();
 }
 
 bool wifiWaitUntilReady(unsigned long timeoutMs) {
@@ -152,7 +212,7 @@ bool wifiWaitUntilReady(unsigned long timeoutMs) {
             break;
         }
 
-        delay(50);
+        schedulerFriendlyDelay(50);
     }
 
     return wifiIsReady();
@@ -163,17 +223,16 @@ bool wifiIsReady() {
 }
 
 IPAddress wifiGetIpAddress() {
+    if (!lockWifiMutex()) {
+        return IPAddress();
+    }
+
 #if APP_WIFI_MODE == APP_WIFI_MODE_AP
-    if (accessPointStarted) {
-        return WiFi.softAPIP();
-    }
-
-    return IPAddress();
+    const IPAddress ip = accessPointStarted ? WiFi.softAPIP() : IPAddress();
 #else
-    if (WiFi.status() == WL_CONNECTED) {
-        return WiFi.localIP();
-    }
-
-    return IPAddress();
+    const IPAddress ip = WiFi.status() == WL_CONNECTED ? WiFi.localIP() : IPAddress();
 #endif
+
+    unlockWifiMutex();
+    return ip;
 }
