@@ -125,6 +125,7 @@ def render_register_page(
     status_message: str | None = None,
     status_kind: str = "success",
     form_data: dict | None = None,
+    registration_completed: bool = False,
     http_status: int = 200,
 ):
     return (
@@ -135,6 +136,7 @@ def render_register_page(
             status_message=status_message,
             status_kind=status_kind,
             form_data=form_data or {},
+            registration_completed=registration_completed,
         ),
         http_status,
     )
@@ -430,6 +432,7 @@ def register_page_submit():
         status_message="Registration completed.",
         status_kind="success",
         form_data={},
+        registration_completed=True,
         http_status=status_code,
     )
 

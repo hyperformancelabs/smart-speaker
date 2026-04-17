@@ -32,11 +32,6 @@ export function renderLogin() {
                     <small id="form-error" class="text-danger" style="display: none; font-size: 0.85rem; text-align: center; margin-top: 4px; margin-bottom: 8px; font-weight: bold;"></small>
                     <button type="submit" class="btn-secondary">Đăng nhập</button>
                 </form>
-                
-                <div class="auth-footer">
-                    <p>Cần tạo hồ sơ lần đầu bằng thẻ NFC?</p>
-                    <a href="/register" id="link-signup" class="text-link">Mở trang đăng ký</a>
-                </div>
             </div>
             
             <div class="ambient-glow glow-1"></div>

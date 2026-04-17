@@ -52,6 +52,20 @@
       .register-note strong {
         color: var(--text-main);
       }
+
+      .register-actions {
+        margin-top: 1.5rem;
+      }
+
+      .register-actions .btn-secondary {
+        display: inline-flex;
+        width: 100%;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0.8rem 1.5rem;
+        font-weight: 600;
+      }
     </style>
   </head>
   <body>
@@ -77,6 +91,14 @@
         <div class="register-flash {{ status_kind }}">{{ status_message }}</div>
         {% endif %}
 
+        {% if registration_completed %}
+        <div class="register-actions">
+          <a href="/" class="btn-secondary">
+            <i class="fa-solid fa-arrow-left"></i>
+            Quay về màn hình login
+          </a>
+        </div>
+        {% else %}
         <form method="post" action="/register" class="modern-form">
           <input type="hidden" name="nfc_tag_id" value="{{ nfc_tag_id or '' }}" />
 
@@ -124,10 +146,7 @@
             Hoàn tất đăng ký
           </button>
         </form>
-
-        <div class="auth-footer">
-          <a href="/" class="text-link">Quay lại dashboard</a>
-        </div>
+        {% endif %}
 
         <p class="register-note">
           <strong>Lưu ý:</strong> Sau khi đăng ký xong, hãy chạm lại thẻ vào speaker để thiết bị nhận hồ sơ mới.
