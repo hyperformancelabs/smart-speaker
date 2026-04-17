@@ -14,7 +14,7 @@ try:
 except ModuleNotFoundError:
     def dotenv_values(*args, **kwargs):
         return {}
-from flask import Flask, jsonify, render_template_string, request
+from flask import Flask, jsonify, render_template, render_template_string, request
 from sqlalchemy import text
 from profile_schema import build_default_preferences, merge_preferences, normalize_preferences
 
@@ -24,7 +24,7 @@ ENV_VALUES = dotenv_values(ENV_FILE)
 
 from models import Alarm, InteractionLog, List, ListItem, Timer, User, db
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="static", template_folder="templates")
 app.json.ensure_ascii = False
 DEFAULT_SERVER_PORT = 8386
 REGISTER_HOST = "register.ssproject.hyperformancelabs.click"
@@ -387,6 +387,11 @@ def render_register_page(
 USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9_]+$")
 
 
+@app.route("/", methods=["GET"])
+def dashboard_page():
+    return render_template("index.html")
+
+
 def is_valid_user_name(value: str | None) -> bool:
     return value is None or bool(USERNAME_PATTERN.fullmatch(value))
 
@@ -671,6 +676,22 @@ def register_page_submit():
         form_data={},
         http_status=status_code,
     )
+
+
+@app.route("/api/auth/login", methods=["POST"])
+def login():
+    data = request.get_json(silent=True) or {}
+    user_name = normalize_optional_text(data.get("user_name"))
+    user_password = normalize_optional_text(data.get("user_password"))
+
+    if not user_name or not user_password:
+        return jsonify({"error": "Missing user_name or user_password"}), 400
+
+    user = User.query.filter_by(user_name=user_name).first()
+    if not user or not user.check_user_password(user_password):
+        return jsonify({"error": "Invalid credentials"}), 401
+
+    return jsonify(user.to_dict()), 200
 
 
 @app.route("/api/users/register", methods=["POST"])
