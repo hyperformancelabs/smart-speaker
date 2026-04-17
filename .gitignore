@@ -17,6 +17,7 @@ include/secrets.h
 *__pycache__/
 *.pyc
 *.venv/
+*.log
 
 *.wav
 *.mp3
