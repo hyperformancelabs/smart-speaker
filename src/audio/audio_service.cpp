@@ -19,6 +19,7 @@ enum class AudioDriverMode {
 
 constexpr TickType_t kAudioIoTimeoutTicks = pdMS_TO_TICKS(20);
 constexpr TickType_t kAmplifierSettleTicks = pdMS_TO_TICKS(20);
+constexpr TickType_t kPlaybackDrainGuardTicks = pdMS_TO_TICKS(24);
 constexpr int kMicrophoneGain = 6;
 
 int16_t gWsFrame[FRAME_SAMPLES] = {};
@@ -136,7 +137,6 @@ void installDriverLocked(AudioDriverMode nextMode) {
     }
 
     setAmplifierEnabled(nextMode == AudioDriverMode::Playback);
-    i2s_zero_dma_buffer(I2S_PORT);
     gDriverMode = nextMode;
     Serial.printf("audio: switched route to %s\n",
                   nextMode == AudioDriverMode::Capture ? "capture" : "playback");
@@ -238,7 +238,9 @@ void audioBeep(int freq, int ms) {
     while (total > 0) {
         const int n = min(total, 256);
         for (int i = 0; i < n; i++) {
-            const int16_t s = static_cast<int16_t>(sin(phase) * 7000);
+            // Keep the tone loud enough to cut through the shared I2S route
+            // transition without changing the overall beep logic.
+            const int16_t s = static_cast<int16_t>(sin(phase) * 22000);
             phase += inc;
             buf[i * 2] = s;
             buf[i * 2 + 1] = s;
@@ -247,9 +249,13 @@ void audioBeep(int freq, int ms) {
         total -= n;
     }
 
-    vTaskDelay(pdMS_TO_TICKS(8));
+    // i2s_write() returns when samples are queued into DMA, not necessarily
+    // when they have fully reached the amplifier. Hold the route long enough
+    // for short beeps to drain instead of switching back to capture mid-tone.
+    vTaskDelay(pdMS_TO_TICKS(ms) + kPlaybackDrainGuardTicks);
 
     if (previousMode == AudioDriverMode::Capture) {
+        i2s_zero_dma_buffer(I2S_PORT);
         installDriverLocked(AudioDriverMode::Capture);
     }
 
