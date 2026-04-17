@@ -4,6 +4,7 @@ import logging
 from pathlib import Path
 import os
 import subprocess
+import time
 from typing import Any
 
 from flask import Flask, Response, jsonify, render_template, request, send_file, stream_with_context
@@ -24,6 +25,7 @@ from config import (
 from dev_console import DEFAULT_BROWSER_DEVICE_ID, parse_json_object, run_browser_turn
 from device_session_store import device_session_store
 from logging_utils import configure_logging, is_loopback_base_url, log_kv
+from tts_service import tts_service
 from youtube_stream_tool import resolve_youtube_stream
 
 try:
@@ -451,6 +453,26 @@ def stop_audio_capture():
 
 
 def main() -> None:
+    prewarm_started_at = time.monotonic()
+    try:
+        tts_service.prewarm()
+        log_kv(
+            logger,
+            logging.INFO,
+            "tts_prewarm_completed",
+            voice_name=tts_service.voice_name,
+            elapsed_ms=round((time.monotonic() - prewarm_started_at) * 1000),
+        )
+    except Exception as exc:
+        logger.exception("tts_prewarm_failed")
+        log_kv(
+            logger,
+            logging.WARNING,
+            "tts_prewarm_failed",
+            error=str(exc),
+            elapsed_ms=round((time.monotonic() - prewarm_started_at) * 1000),
+        )
+
     log_kv(
         logger,
         logging.INFO,

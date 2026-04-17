@@ -265,6 +265,10 @@ class TTSService:
         self.voice_name = str(self._voices[self.voice_id][1])
         self.voice_data = self._tts.get_preset_voice(self.voice_name)
 
+    def prewarm(self) -> None:
+        with self._lock:
+            self._ensure_model_loaded()
+
     def _normalize_wav(self, source_path: Path, output_path: Path) -> None:
         command = [
             FFMPEG_BIN,
