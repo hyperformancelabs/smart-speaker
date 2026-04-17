@@ -18,7 +18,7 @@ import websocket
 
 try:
     from .assistant_service import run_assistant_turn
-    from .faster_whisper_stt import TranscriptionResult, transcribe_audio_file
+    from .groq_whisper_stt import TranscriptionResult, transcribe_audio_file
     from .logging_utils import log_kv
     from .session_control import (
         AudioSessionDirective,
@@ -29,7 +29,7 @@ try:
     from .silero_vad_segmenter import FirstUtteranceDetector, SileroVadConfig, SpeechSegment
 except ImportError:
     from assistant_service import run_assistant_turn
-    from faster_whisper_stt import TranscriptionResult, transcribe_audio_file
+    from groq_whisper_stt import TranscriptionResult, transcribe_audio_file
     from logging_utils import log_kv
     from session_control import (
         AudioSessionDirective,
@@ -393,7 +393,7 @@ class CaptureSession:
             return transcribe_audio_file(utterance_path)
         except Exception as exc:
             raise FirstUtteranceProcessingError(
-                f"failed to transcribe first utterance with faster-whisper: {exc}"
+                f"failed to transcribe first utterance with Groq Whisper: {exc}"
             ) from exc
 
     def _send_audio_session_directive(

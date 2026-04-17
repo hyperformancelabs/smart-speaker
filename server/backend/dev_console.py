@@ -9,7 +9,7 @@ from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
 
 from assistant_service import run_assistant_turn
-from faster_whisper_stt import transcribe_audio_file
+from groq_whisper_stt import transcribe_audio_file
 
 
 BASE_DIR = Path(__file__).resolve().parent

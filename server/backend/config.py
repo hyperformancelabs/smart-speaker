@@ -12,6 +12,11 @@ BASE_DIR = Path(__file__).resolve().parent
 ENV_FILE = BASE_DIR / ".env"
 load_dotenv(ENV_FILE)
 
+
+def _getenv_csv(name: str, default: str = "") -> tuple[str, ...]:
+    raw_value = os.getenv(name, default)
+    return tuple(part.strip() for part in raw_value.split(",") if part.strip())
+
 # LLM configuration
 LLM_MODEL = os.getenv("LLM_MODEL", "gemma-3-27b-it")
 SMALL_LLM_MODEL = os.getenv("SMALL_LLM_MODEL", "gemma-3-4b-it")
@@ -21,6 +26,21 @@ LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "1024"))
 
 # Database API
 BACKEND_API_URL = os.getenv("BACKEND_API_URL", "http://localhost:8386")
+
+# Groq Speech-to-Text
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", os.getenv("GROQ_STT_API_KEY", "")).strip()
+GROQ_STT_BASE_URL = os.getenv("GROQ_STT_BASE_URL", os.getenv("GROQ_BASE_URL", "")).strip()
+GROQ_STT_MODEL = os.getenv("GROQ_STT_MODEL", "whisper-large-v3-turbo").strip()
+GROQ_STT_LANGUAGE = os.getenv("GROQ_STT_LANGUAGE", "").strip()
+GROQ_STT_PROMPT = os.getenv("GROQ_STT_PROMPT", "").strip()
+GROQ_STT_RESPONSE_FORMAT = os.getenv("GROQ_STT_RESPONSE_FORMAT", "verbose_json").strip()
+GROQ_STT_TEMPERATURE = float(os.getenv("GROQ_STT_TEMPERATURE", "0"))
+GROQ_STT_TIMESTAMP_GRANULARITIES = _getenv_csv(
+    "GROQ_STT_TIMESTAMP_GRANULARITIES",
+    "segment",
+)
+GROQ_STT_TIMEOUT_SECONDS = float(os.getenv("GROQ_STT_TIMEOUT_SECONDS", "60"))
+GROQ_STT_MAX_RETRIES = int(os.getenv("GROQ_STT_MAX_RETRIES", "2"))
 
 # Voice backend HTTP service
 VOICE_BACKEND_PORT = int(os.getenv("VOICE_BACKEND_PORT", os.getenv("LLM_API_PORT", "8387")))

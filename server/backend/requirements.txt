@@ -10,6 +10,6 @@ langchain-google-genai==2.1.4
 websocket-client==1.8.0
 silero-vad
 torch
-faster-whisper
+groq
 vieneu
 yt-dlp
