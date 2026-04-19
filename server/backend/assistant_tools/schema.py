@@ -73,11 +73,11 @@ TOOLS_DEFINITIONS = [
     },
     {
         "name": "create_alarm",
-        "description": "Tạo báo thức mới theo giờ cố định, thời điểm cụ thể, hoặc sau một khoảng thời gian.",
+        "description": "Tạo báo thức mới theo giờ cố định, thời điểm cụ thể, hoặc sau một khoảng thời gian. Nếu user chỉ nói giờ mà không đặt tên, vẫn gọi tool và dùng label mặc định.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "label": {"type": "string", "description": "Mô tả báo thức"},
+                "label": {"type": "string", "description": "Mô tả báo thức. Optional, mặc định là 'Báo thức'."},
                 "time": {"type": "string", "description": "Giờ báo thức định dạng HH:MM khi schedule_type=time"},
                 "repeat": {"type": "string", "enum": ["once", "daily", "weekly"], "description": "Tần suất lặp"},
                 "schedule_type": {
@@ -94,35 +94,36 @@ TOOLS_DEFINITIONS = [
                     "description": "Số giây tính từ hiện tại khi schedule_type=relative",
                 },
             },
-            "required": ["label"],
         },
     },
     {
         "name": "update_alarm",
-        "description": "Cập nhật báo thức hiện có.",
+        "description": "Cập nhật báo thức hiện có. Ưu tiên truyền `alarm_id`, nhưng có thể truyền `time` hoặc `label` nếu user nói rõ target.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "alarm_id": {"type": "string", "description": "ID báo thức cần cập nhật"},
-                "label": {"type": "string", "description": "Nhãn mới"},
-                "time": {"type": "string", "description": "Giờ mới theo HH:MM"},
+                "alarm_id": {"type": "string", "description": "ID báo thức cần cập nhật nếu đã biết"},
+                "label": {"type": "string", "description": "Nhãn mới hoặc nhãn hiện tại để định danh báo thức"},
+                "time": {"type": "string", "description": "Giờ hiện tại hoặc giờ mới theo HH:MM"},
+                "current_label": {"type": "string", "description": "Nhãn hiện tại của báo thức để định danh target"},
+                "current_time": {"type": "string", "description": "Giờ hiện tại HH:MM để định danh báo thức"},
                 "repeat": {"type": "string", "enum": ["once", "daily", "weekly"]},
                 "schedule_type": {"type": "string", "enum": ["time", "datetime", "relative"]},
                 "scheduled_for": {"type": "string", "description": "ISO datetime mới"},
                 "offset_seconds": {"type": "integer", "description": "Số giây mới từ hiện tại"},
             },
-            "required": ["alarm_id"],
         },
     },
     {
         "name": "delete_alarm",
-        "description": "Xóa báo thức.",
+        "description": "Xóa báo thức. Có thể dùng `alarm_id`, `time`, hoặc `label` để định danh target.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "alarm_id": {"type": "string", "description": "ID báo thức cần xóa"},
+                "alarm_id": {"type": "string", "description": "ID báo thức cần xóa nếu đã biết"},
+                "label": {"type": "string", "description": "Nhãn báo thức cần xóa"},
+                "time": {"type": "string", "description": "Giờ báo thức cần xóa theo HH:MM"},
             },
-            "required": ["alarm_id"],
         },
     },
     {
@@ -132,12 +133,12 @@ TOOLS_DEFINITIONS = [
     },
     {
         "name": "start_timer",
-        "description": "Bắt đầu bộ đếm ngược với duration dạng ngày, giờ, phút, giây.",
+        "description": "Bắt đầu bộ đếm ngược với duration dạng ngày, giờ, phút, giây. Nếu user không đặt tên thì dùng label mặc định.",
         "input_schema": {
             "type": "object",
             "properties": {
                 "duration": {"type": "string", "description": "Ví dụ: 1d2h, 10m, 90s"},
-                "label": {"type": "string", "description": "Tên timer"},
+                "label": {"type": "string", "description": "Tên timer. Optional, mặc định là 'Timer'."},
             },
             "required": ["duration"],
         },
@@ -149,35 +150,35 @@ TOOLS_DEFINITIONS = [
     },
     {
         "name": "update_timer",
-        "description": "Cập nhật duration hoặc label của timer đang hoạt động.",
+        "description": "Cập nhật duration hoặc label của timer đang hoạt động. Có thể dùng `timer_id` hoặc `label` để định danh.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "timer_id": {"type": "string", "description": "ID timer cần cập nhật"},
+                "timer_id": {"type": "string", "description": "ID timer cần cập nhật nếu đã biết"},
+                "current_label": {"type": "string", "description": "Label hiện tại của timer để định danh"},
                 "duration": {"type": "string", "description": "Duration mới"},
                 "label": {"type": "string", "description": "Label mới"},
             },
-            "required": ["timer_id"],
         },
     },
     {
         "name": "cancel_timer",
-        "description": "Hủy bộ đếm ngược.",
+        "description": "Hủy bộ đếm ngược. Có thể dùng `timer_id`, `label`, hoặc bỏ trống nếu chỉ có một timer đang chạy.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "timer_id": {"type": "string", "description": "ID timer cần hủy"},
+                "timer_id": {"type": "string", "description": "ID timer cần hủy nếu đã biết"},
+                "label": {"type": "string", "description": "Label timer cần hủy"},
             },
-            "required": ["timer_id"],
         },
     },
     {
         "name": "create_list",
-        "description": "Tạo danh sách mới như todo, shopping list, note list.",
+        "description": "Tạo danh sách mới như todo, shopping list, note list. Nếu user nói rõ loại list, hãy suy ra `list_name` và gọi tool ngay.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "list_name": {"type": "string", "description": "Tên danh sách"},
+                "list_name": {"type": "string", "description": "Tên danh sách, ví dụ `todo`, `shopping`, `notes` hoặc tên riêng user nói rõ"},
             },
             "required": ["list_name"],
         },

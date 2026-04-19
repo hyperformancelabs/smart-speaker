@@ -76,6 +76,74 @@ def _normalize_tool_parameters(tool_name: str, parameters: dict[str, Any]) -> di
         if isinstance(media_type, str) and media_type.strip().lower() in {"audio", "video"}:
             normalized["mode"] = media_type.strip().lower()
 
+    if tool_name == "create_alarm":
+        if "label" not in normalized:
+            for alias in ("name", "title", "alarm_name"):
+                value = normalized.get(alias)
+                if isinstance(value, str) and value.strip():
+                    normalized["label"] = value.strip()
+                    break
+        if "offset_seconds" not in normalized:
+            for alias in ("seconds", "duration_seconds"):
+                value = normalized.get(alias)
+                if value is not None:
+                    normalized["offset_seconds"] = value
+                    break
+
+    if tool_name in {"update_alarm", "delete_alarm"} and "alarm_id" not in normalized:
+        for alias in ("id", "alarm", "target_alarm_id"):
+            value = normalized.get(alias)
+            if isinstance(value, str) and value.strip():
+                normalized["alarm_id"] = value.strip()
+                break
+
+    if tool_name in {"start_timer", "update_timer", "cancel_timer"}:
+        if "label" not in normalized:
+            for alias in ("name", "title", "timer_name"):
+                value = normalized.get(alias)
+                if isinstance(value, str) and value.strip():
+                    normalized["label"] = value.strip()
+                    break
+        if "timer_id" not in normalized:
+            for alias in ("id", "timer", "target_timer_id"):
+                value = normalized.get(alias)
+                if isinstance(value, str) and value.strip():
+                    normalized["timer_id"] = value.strip()
+                    break
+        if tool_name == "update_timer" and "current_label" not in normalized:
+            value = normalized.get("target_label")
+            if isinstance(value, str) and value.strip():
+                normalized["current_label"] = value.strip()
+
+    if tool_name == "create_list" and "list_name" not in normalized:
+        for alias in ("name", "title", "list", "category"):
+            value = normalized.get(alias)
+            if isinstance(value, str) and value.strip():
+                normalized["list_name"] = value.strip()
+                break
+
+    if tool_name in {"rename_list", "delete_list", "list_items", "add_list_item", "update_list_item", "remove_list_item"}:
+        if "list_name" not in normalized:
+            for alias in ("list", "name", "title"):
+                value = normalized.get(alias)
+                if isinstance(value, str) and value.strip():
+                    normalized["list_name"] = value.strip()
+                    break
+
+    if tool_name in {"add_list_item", "update_list_item", "remove_list_item"} and "item" not in normalized:
+        for alias in ("content", "task", "task_name"):
+            value = normalized.get(alias)
+            if isinstance(value, str) and value.strip():
+                normalized["item"] = value.strip()
+                break
+
+    if tool_name == "update_list_item" and "new_item" not in normalized:
+        for alias in ("updated_item", "new_content", "replacement"):
+            value = normalized.get(alias)
+            if isinstance(value, str) and value.strip():
+                normalized["new_item"] = value.strip()
+                break
+
     return normalized
 
 

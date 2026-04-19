@@ -154,6 +154,63 @@ def _build_debug_session_payload(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _compact_debug_identifier(value: str | None) -> str:
+    return "".join(character for character in str(value or "") if character.isalnum()).lower()
+
+
+def _build_debug_registration_payload(nfc_tag_id: str) -> dict[str, str]:
+    compact_nfc_tag_id = _compact_debug_identifier(nfc_tag_id) or "debug"
+    return {
+        "nfc_tag_id": nfc_tag_id,
+        "user_name": f"debug_{compact_nfc_tag_id}",
+        "user_password": f"debug-pass-{compact_nfc_tag_id}",
+        "name": "Debug User",
+    }
+
+
+def _ensure_debug_user_registration(nfc_tag_id: str | None) -> dict[str, Any] | None:
+    normalized_nfc_tag_id = str(nfc_tag_id or "").strip()
+    if not normalized_nfc_tag_id:
+        return None
+
+    user_url = f"{BACKEND_API_URL}/api/users/{normalized_nfc_tag_id}"
+    try:
+        response = requests.get(user_url, timeout=5)
+        if response.status_code == 200:
+            payload = response.json()
+            return payload if isinstance(payload, dict) else None
+        if response.status_code != 404:
+            response.raise_for_status()
+            return None
+    except requests.RequestException:
+        logger.exception("debug_user_lookup_failed")
+        return None
+
+    registration_payload = _build_debug_registration_payload(normalized_nfc_tag_id)
+    try:
+        response = requests.post(
+            f"{BACKEND_API_URL}/api/users/register",
+            json=registration_payload,
+            timeout=5,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        log_kv(
+            logger,
+            logging.INFO,
+            "debug_user_auto_registered",
+            nfc_tag_id=normalized_nfc_tag_id,
+            user_name=registration_payload["user_name"],
+        )
+        return payload if isinstance(payload, dict) else None
+    except requests.RequestException:
+        logger.exception(
+            "debug_user_auto_registration_failed",
+            extra={"nfc_tag_id": normalized_nfc_tag_id},
+        )
+        return None
+
+
 @app.route("/health", methods=["GET"])
 def health_check():
     return (
@@ -311,6 +368,8 @@ def api_test() -> tuple[dict[str, Any], int] | tuple[Response, int]:
     if isinstance(session_state, dict):
         test_payload["session_state"] = session_state
 
+    _ensure_debug_user_registration(test_payload["nfc_tag_id"])
+
     try:
         result = run_assistant_turn(test_payload)
     except ValueError as exc:
@@ -328,6 +387,7 @@ def browser_assistant_turn() -> tuple[dict[str, Any], int] | tuple[Response, int
 
     try:
         debug_payload = _build_debug_session_payload(payload)
+        _ensure_debug_user_registration(debug_payload["nfc_tag_id"])
         result = run_browser_turn(
             text_input=str(payload.get("text_input") or "").strip() or None,
             audio_upload=audio_upload if audio_upload and audio_upload.filename else None,

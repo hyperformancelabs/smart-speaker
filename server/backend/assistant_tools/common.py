@@ -11,6 +11,24 @@ BACKEND_API_URL = os.getenv("BACKEND_API_URL", "http://localhost:8386")
 BACKEND_TIMEOUT_SECONDS = 5
 
 
+def _extract_backend_error_message(response: requests.Response) -> str:
+    try:
+        payload = response.json()
+    except ValueError:
+        payload = None
+
+    if isinstance(payload, dict):
+        for key in ("error", "message", "detail"):
+            value = payload.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+
+    reason = str(getattr(response, "reason", "") or "").strip()
+    if reason:
+        return reason
+    return f"Database API request failed with status {response.status_code}"
+
+
 def extract_domain(url: str) -> str:
     parsed = urlparse(url)
     return parsed.netloc.replace("www.", "")
@@ -46,7 +64,8 @@ def backend_request(
         json=json_payload,
         timeout=timeout,
     )
-    response.raise_for_status()
+    if response.status_code >= 400:
+        raise RuntimeError(_extract_backend_error_message(response))
     return response
 
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 import time
 import unicodedata
@@ -22,6 +23,9 @@ from assistant_core.utils import (
 from assistant_core.wrapper import LLMWrapper
 from assistant_tools.registry import execute_tool
 from config import BACKEND_API_URL, EDGE_PAYLOAD_VERSION, MAX_CONVERSATION_HISTORY
+from logging_utils import log_kv
+
+logger = logging.getLogger(__name__)
 
 CONFIRMATION_QUESTION_HINTS = (
     "bạn có chắc",
@@ -154,6 +158,8 @@ GENERIC_INFORMATION_REQUESTS = {
     "search",
 }
 MEDIA_FILLER_WORDS = {
+    "hãy",
+    "hay",
     "phát",
     "phat",
     "mở",
@@ -172,6 +178,8 @@ MEDIA_FILLER_WORDS = {
     "nhac",
     "bài",
     "bai",
+    "của",
+    "cua",
     "youtube",
 }
 PERSONAL_DISCLOSURE_PATTERNS = (
@@ -268,6 +276,16 @@ FOLLOW_UP_OFFER_HINTS = (
     "co gi toi co the giup them",
     "ban co can minh giup them",
     "ban co muon minh giup them",
+    "ban co muon biet them",
+    "ban co muon xem them",
+    "ban co muon nghe them",
+    "ban co muon tim hieu them",
+    "ban co muon tra cuu them",
+    "ban co muon biet them thong tin gi khong",
+    "co muon biet them gi khong",
+    "co muon xem them gi khong",
+    "co muon nghe them gi khong",
+    "minh co the giup gi them",
     "can gi them khong",
     "anything else",
     "help with anything else",
@@ -489,6 +507,41 @@ def _resolve_confirmation_reply(
             "confidence": 0.0,
         }
 
+
+def _resolve_clarification_reply(
+    state: LLMState,
+    runtime,
+    *,
+    group: str,
+    pending: dict[str, Any],
+) -> dict[str, Any]:
+    llm: LLMWrapper = runtime.context.llm
+    session_state = _normalize_session_state(state.get("session_state"))
+    context_strings = _build_context_strings(session_state, group)
+
+    try:
+        return llm.resolve_clarification_reply(
+            group=group,
+            subtask=pending.get("subtask", ""),
+            pending_question=pending.get("question", ""),
+            original_user_input=pending.get("original_user_input", ""),
+            user_reply=state.get("text_input", ""),
+            response_preferences=_response_preferences_text(state.get("user_profile", {})),
+            task_summary=context_strings["task_summary"],
+            task_transcript=context_strings["task_transcript"],
+            conversation_summary=context_strings["conversation_summary"],
+            conversation_transcript=context_strings["conversation_transcript"],
+            session_mode=session_state.get("mode", "conversation"),
+        )
+    except Exception:
+        return {
+            "decision": "unclear",
+            "assistant_text": "Mình cần bạn nói rõ hơn một chút để mình hiểu đúng ý.",
+            "rewritten_user_input": "",
+            "reason": "resolver_exception",
+            "confidence": 0.0,
+        }
+
 def _looks_like_question_text(text: str) -> bool:
     normalized = _normalize_lookup_text(text)
     if not normalized:
@@ -523,7 +576,40 @@ def _looks_like_follow_up_offer(text: str) -> bool:
     normalized = _normalize_lookup_text(text)
     if not normalized:
         return False
-    return any(hint in normalized for hint in FOLLOW_UP_OFFER_HINTS)
+    if any(hint in normalized for hint in FOLLOW_UP_OFFER_HINTS):
+        return True
+    generic_patterns = (
+        r"\bban co muon (?:biet|xem|nghe|tim hieu|tra cuu) them\b",
+        r"\b(?:co muon|muon) (?:biet|xem|nghe|tim hieu|tra cuu) them\b",
+        r"\bco gi .*giup them\b",
+        r"\bthong tin gi khong\b",
+        r"\bban co muon minh (?:ke|noi|giai thich|phan tich).*(?:hon|them).*(?:khong|khong ne)\b",
+    )
+    return any(re.search(pattern, normalized) for pattern in generic_patterns)
+
+
+def _trim_trailing_follow_up_offer(text: str) -> str:
+    cleaned = " ".join((text or "").split()).strip()
+    if not cleaned:
+        return ""
+
+    trailing_patterns = (
+        r"\s*(?:[Bb]ạn|[Bb]an)\s+có\s+muốn\s+(?:(?:mình|minh)\s+)?(?:biết thêm|xem thêm|nghe thêm|tìm hiểu thêm|tra cứu thêm|kể|nói|giai thich|giải thích|phan tich|phân tích)[^.?!]*$",
+        r"\s*(?:[Cc]ó|[Cc]o)\s+muốn\s+(?:(?:mình|minh)\s+)?(?:biết thêm|xem thêm|nghe thêm|kể|nói|giai thich|giải thích|phan tich|phân tích)[^.?!]*$",
+    )
+    for pattern in trailing_patterns:
+        trimmed = re.sub(pattern, "", cleaned, flags=re.IGNORECASE).strip(" ,;:-")
+        if trimmed != cleaned:
+            return trimmed
+
+    segments = [segment.strip() for segment in re.split(r"(?<=[.!?])\s+", cleaned) if segment.strip()]
+    if len(segments) <= 1:
+        return cleaned
+    if _looks_like_follow_up_offer(segments[-1]):
+        trimmed = " ".join(segments[:-1]).strip()
+        if trimmed:
+            return trimmed
+    return cleaned
 
 
 def _looks_like_end_conversation(user_input: str) -> bool:
@@ -548,16 +634,6 @@ def _looks_like_math_query(user_input: str) -> bool:
     if any(keyword in normalized for keyword in math_keywords):
         return True
     return bool(re.fullmatch(r"[\d\s\+\-\*\/\^\(\)\.\,%x÷×=]+", normalized))
-
-
-def _is_generic_information_request(user_input: str) -> bool:
-    normalized = _normalize_lookup_text(user_input)
-    if not normalized:
-        return True
-    if normalized in GENERIC_INFORMATION_REQUESTS:
-        return True
-    informative_tokens = [token for token in _tokenize_text(normalized) if token not in {"hãy", "hay", "tra", "cứu", "tim", "tìm"}]
-    return len(informative_tokens) <= 1
 
 
 def _looks_like_personal_disclosure(user_input: str) -> bool:
@@ -835,6 +911,17 @@ def _merge_followup_text(original_text: str, follow_up_text: str) -> str:
     normalized_follow_up = _normalize_lookup_text(follow_up)
     if normalized_follow_up in normalized_original:
         return original
+    if normalized_original in normalized_follow_up:
+        return follow_up
+
+    original_tokens = set(_tokenize_text(normalized_original))
+    follow_up_tokens = set(_tokenize_text(normalized_follow_up))
+    overlap_ratio = (
+        len(original_tokens & follow_up_tokens) / max(1, min(len(original_tokens), len(follow_up_tokens)))
+    )
+    similarity = SequenceMatcher(None, normalized_original, normalized_follow_up).ratio()
+    if len(follow_up_tokens) >= 2 and (overlap_ratio >= 0.67 or similarity >= 0.55):
+        return follow_up
     return f"{original} {follow_up}".strip()
 
 
@@ -871,7 +958,7 @@ def _media_candidate_score(query: str, result: dict[str, Any]) -> float:
 
 def _task_requires_confirmation(group: str, subtask: str, tool_plan: list[dict[str, Any]]) -> bool:
     if group == "productivity":
-        return subtask not in READ_ONLY_PRODUCTIVITY_SUBTASKS and bool(tool_plan)
+        return False
     if group == "personalization":
         if any(tool.get("name") in {"update_user_profile", "save_memory", "delete_memory"} for tool in tool_plan):
             return True
@@ -1425,6 +1512,17 @@ def router_agent(state: LLMState, runtime) -> dict[str, Any]:
     route_group = route_result.get("group", "conversation")
     return_mode = _derive_return_mode(session_state, route_group)
     latency = int((time.time() - start_time) * 1000)
+    log_kv(
+        logger,
+        logging.INFO,
+        "router_decision",
+        user_input=user_input,
+        route_group=route_group,
+        confidence=route_result.get("confidence", 0.5),
+        reason=route_result.get("reason", ""),
+        return_mode=return_mode,
+        latency_ms=latency,
+    )
     intent_classification = {
         "group": route_group,
         "intent": route_group,
@@ -1474,10 +1572,18 @@ def chat_node(state: LLMState, runtime) -> dict[str, Any]:
     return route_update
 
 
-def _run_llm_group_agent(state: LLMState, runtime, group: str, effective_input: str) -> dict[str, Any]:
+def _run_llm_group_agent(
+    state: LLMState,
+    runtime,
+    group: str,
+    effective_input: str,
+    *,
+    tools_available: list[str] | None = None,
+) -> dict[str, Any]:
     llm: LLMWrapper = runtime.context.llm
     session_state = _normalize_session_state(state.get("session_state"))
     context_strings = _build_context_strings(session_state, group)
+    selected_tools = tools_available if tools_available is not None else list(TASK_GROUPS.get(group, {}).get("tools", []))
     return llm.run_group_agent(
         group=group,
         user_input=effective_input,
@@ -1489,7 +1595,7 @@ def _run_llm_group_agent(state: LLMState, runtime, group: str, effective_input: 
         task_transcript=context_strings["task_transcript"],
         conversation_summary=context_strings["conversation_summary"],
         conversation_transcript=context_strings["conversation_transcript"],
-        tools_available=list(TASK_GROUPS.get(group, {}).get("tools", [])),
+        tools_available=selected_tools,
         session_mode=session_state.get("mode", "conversation"),
         return_mode=state.get("route_return_mode", "conversation"),
         pending_summary=_pending_summary(session_state),
@@ -1538,6 +1644,12 @@ def _normalize_tool_synthesis_output(
     normalized = dict(synthesis_result or {})
     dialogue_action = str(normalized.get("dialogue_action", "respond_only") or "respond_only")
     response_text = str(normalized.get("assistant_text", "") or "")
+    missing_fields = normalized.get("missing_fields", [])
+    if not isinstance(missing_fields, list):
+        missing_fields = []
+
+    if _looks_like_follow_up_offer(response_text) and not missing_fields:
+        dialogue_action = "respond_only"
 
     if (
         group != "conversation"
@@ -1549,6 +1661,7 @@ def _normalize_tool_synthesis_output(
 
     normalized["dialogue_action"] = dialogue_action
     normalized["assistant_text"] = response_text
+    normalized["missing_fields"] = missing_fields
     return normalized
 
 
@@ -1667,29 +1780,6 @@ def information_query_agent(state: LLMState, runtime) -> dict[str, Any]:
             task_status="in_progress",
             dialogue_action="use_tools",
             tool_calls=[{"name": "calculator", "parameters": {"expression": user_input}}],
-            task_input=user_input,
-        )
-
-    if _is_generic_information_request(user_input):
-        question = "Bạn muốn mình tra cứu thông tin gì cụ thể hơn?"
-        session_state = _set_active_pending(
-            session_state,
-            group="information_query",
-            return_mode=return_mode,
-            kind="clarification",
-            question=question,
-            original_user_input=user_input,
-            subtask="search_information",
-        )
-        return _make_update(
-            state=state,
-            response_text=question,
-            session_state=session_state,
-            group="information_query",
-            subtask="search_information",
-            confidence=0.75,
-            task_status="needs_clarification",
-            dialogue_action="ask_clarification",
             task_input=user_input,
         )
 
@@ -1815,16 +1905,52 @@ def _handle_confirmation_pending(
     ), user_input, session_state
 
 
-def _handle_clarification_pending(state: LLMState, group: str) -> tuple[str, dict[str, Any]]:
+def _handle_clarification_pending(state: LLMState, runtime, group: str) -> tuple[dict[str, Any] | None, str, dict[str, Any]]:
     session_state = _normalize_session_state(state.get("session_state"))
     active_task = _normalize_task_context(session_state.get("active_task"))
     pending = _get_active_pending(session_state)
     user_input = state.get("text_input", "")
     if not active_task or active_task.get("group") != group or not pending or pending.get("kind") != "clarification":
-        return user_input, session_state
-    merged_input = _merge_followup_text(pending.get("original_user_input", ""), user_input)
-    session_state = _clear_active_pending(session_state)
-    return merged_input, session_state
+        return None, user_input, session_state
+
+    resolution = _resolve_clarification_reply(state, runtime, group=group, pending=pending)
+    decision = resolution.get("decision", "unclear")
+    original_user_input = pending.get("original_user_input") or user_input
+    confidence = resolution.get("confidence", 0.8)
+    subtask = pending.get("subtask", active_task.get("subtask", ""))
+
+    if decision == "resolved":
+        rewritten_input = resolution.get("rewritten_user_input") or _merge_followup_text(original_user_input, user_input)
+        session_state = _clear_active_pending(session_state)
+        return None, rewritten_input, session_state
+
+    if decision == "cancel":
+        session_state = _clear_active_pending(session_state)
+        return _make_update(
+            state=state,
+            response_text="Được rồi, mình sẽ dừng yêu cầu đó.",
+            session_state=session_state,
+            group=group,
+            subtask=subtask,
+            confidence=confidence,
+            task_status="completed",
+            dialogue_action="respond_only",
+            task_input=original_user_input,
+        ), user_input, session_state
+
+    question = resolution.get("assistant_text") or pending.get("question") or "Mình cần bạn nói rõ hơn một chút."
+    return _make_update(
+        state=state,
+        response_text=question,
+        session_state=session_state,
+        group=group,
+        subtask=subtask,
+        confidence=confidence,
+        task_status="needs_clarification",
+        dialogue_action="ask_clarification",
+        task_input=original_user_input,
+        missing_fields=pending.get("missing_fields", []),
+    ), user_input, session_state
 
 
 def productivity_agent(state: LLMState, runtime) -> dict[str, Any]:
@@ -1838,15 +1964,35 @@ def productivity_agent(state: LLMState, runtime) -> dict[str, Any]:
     if confirmation_update is not None:
         return confirmation_update
 
-    user_input, session_state = _handle_clarification_pending(
+    clarification_update, user_input, session_state = _handle_clarification_pending(
         {**state, "text_input": user_input, "session_state": session_state},
+        runtime,
         "productivity",
     )
+    if clarification_update is not None:
+        return clarification_update
     return_mode = state.get("route_return_mode", "conversation")
     agent_result = _normalize_task_agent_result(
         "productivity",
-        _run_llm_group_agent({**state, "session_state": session_state}, runtime, "productivity", user_input),
+        _run_llm_group_agent(
+            {**state, "session_state": session_state},
+            runtime,
+            "productivity",
+            user_input,
+        ),
         fallback_subtask="productivity_action",
+    )
+    log_kv(
+        logger,
+        logging.INFO,
+        "productivity_llm_plan_selected",
+        user_input=user_input,
+        current_time=state.get("current_time") or get_current_time_string(),
+        dialogue_action=agent_result.get("dialogue_action"),
+        subtask=agent_result.get("subtask"),
+        tool_plan=agent_result.get("tool_plan", []),
+        missing_fields=agent_result.get("missing_fields", []),
+        assistant_text=agent_result.get("assistant_text"),
     )
     response_text = agent_result.get("assistant_text") or "Mình đang xử lý yêu cầu của bạn."
     tool_plan = agent_result.get("tool_plan", [])
@@ -1873,6 +2019,29 @@ def productivity_agent(state: LLMState, runtime) -> dict[str, Any]:
             task_status="needs_clarification",
             dialogue_action="ask_clarification",
             missing_fields=agent_result.get("missing_fields", []),
+            task_input=user_input,
+        )
+
+    if agent_result.get("dialogue_action") == "ask_confirmation" and tool_plan:
+        session_state = _set_active_pending(
+            session_state,
+            group="productivity",
+            return_mode=return_mode,
+            kind="confirmation",
+            question=response_text,
+            original_user_input=user_input,
+            subtask=subtask,
+            tool_plan=tool_plan,
+        )
+        return _make_update(
+            state=state,
+            response_text=response_text,
+            session_state=session_state,
+            group="productivity",
+            subtask=subtask,
+            confidence=agent_result.get("confidence", 0.8),
+            task_status="needs_confirmation",
+            dialogue_action="ask_confirmation",
             task_input=user_input,
         )
 
@@ -1927,10 +2096,13 @@ def personalization_agent(state: LLMState, runtime) -> dict[str, Any]:
     if confirmation_update is not None:
         return confirmation_update
 
-    user_input, session_state = _handle_clarification_pending(
+    clarification_update, user_input, session_state = _handle_clarification_pending(
         {**state, "text_input": user_input, "session_state": session_state},
+        runtime,
         "personalization",
     )
+    if clarification_update is not None:
+        return clarification_update
     return_mode = state.get("route_return_mode", "conversation")
 
     reset_request = _extract_personal_data_reset_request(user_input)
@@ -2249,6 +2421,15 @@ def execute_tools(state: LLMState, runtime) -> dict[str, Any]:
     for tool_call in tool_calls:
         tool_name = tool_call.get("name")
         parameters = tool_call.get("parameters", {})
+        log_kv(
+            logger,
+            logging.INFO,
+            "tool_execution_started",
+            route_group=route_group,
+            tool_name=tool_name,
+            parameters=parameters,
+            nfc_tag_id=nfc_tag_id,
+        )
         start_time = time.time()
         if allowed_tools and tool_name not in allowed_tools:
             result = {
@@ -2259,6 +2440,20 @@ def execute_tools(state: LLMState, runtime) -> dict[str, Any]:
             result = execute_tool(tool_name=tool_name, parameters=parameters, nfc_tag_id=nfc_tag_id)
         execution_time = int((time.time() - start_time) * 1000)
         total_execution_time += execution_time
+        log_kv(
+            logger,
+            logging.INFO,
+            "tool_execution_completed",
+            route_group=route_group,
+            tool_name=tool_name,
+            parameters=parameters,
+            status=result.get("status"),
+            message=result.get("message"),
+            error_code=result.get("error_code"),
+            user_hint=result.get("user_hint"),
+            execution_time_ms=execution_time,
+            result_payload=result.get("device_payload") or result,
+        )
         aggregated_results.append(
             {
                 "tool": tool_name,
@@ -2361,6 +2556,74 @@ def _handle_media_search_results(state: LLMState, search_result: dict[str, Any])
     )
 
 
+def _synthesize_failed_tool_turn(
+    state: LLMState,
+    runtime,
+    *,
+    session_state: dict[str, Any],
+    route_group: str,
+    fallback_message: str,
+) -> dict[str, Any] | None:
+    llm: LLMWrapper = runtime.context.llm
+    context_strings = _build_context_strings(session_state, route_group)
+    try:
+        synthesis_result = _normalize_tool_synthesis_output(
+            route_group,
+            llm.synthesize_tool_results(
+                group=route_group,
+                user_input=state.get("task_input") or state.get("text_input", ""),
+                draft_response=state.get("response_text", "") or fallback_message,
+                answer_policy={},
+                tool_results=state.get("tool_results", []),
+                response_preferences=_response_preferences_text(state.get("user_profile", {})),
+                task_summary=context_strings["task_summary"],
+                task_transcript=context_strings["task_transcript"],
+                conversation_summary=context_strings["conversation_summary"],
+                conversation_transcript=context_strings["conversation_transcript"],
+                session_mode=session_state.get("mode", "conversation"),
+            ),
+        )
+    except Exception as exc:
+        logger.warning("tool_failure_synthesis_failed | route_group=%s | error=%s", route_group, exc)
+        return None
+
+    response_text = str(synthesis_result.get("assistant_text", "") or "").strip() or fallback_message
+    if synthesis_result.get("dialogue_action") == "ask_clarification":
+        missing_fields = synthesis_result.get("missing_fields", [])
+        session_state = _set_active_pending(
+            session_state,
+            group=route_group,
+            return_mode=state.get("route_return_mode", "conversation"),
+            kind="clarification",
+            question=response_text,
+            original_user_input=state.get("task_input") or state.get("text_input", ""),
+            subtask=state.get("metadata", {}).get("subtask", route_group),
+            missing_fields=missing_fields,
+        )
+        return _make_update(
+            state=state,
+            response_text=response_text,
+            session_state=session_state,
+            group=route_group,
+            subtask=state.get("metadata", {}).get("subtask", route_group),
+            confidence=synthesis_result.get("confidence", state.get("metadata", {}).get("confidence", 0.7)),
+            task_status="needs_clarification",
+            dialogue_action="ask_clarification",
+            missing_fields=missing_fields,
+        )
+
+    return _make_update(
+        state=state,
+        response_text=response_text,
+        session_state=session_state,
+        group=route_group,
+        subtask=state.get("metadata", {}).get("subtask", route_group),
+        confidence=synthesis_result.get("confidence", state.get("metadata", {}).get("confidence", 0.7)),
+        task_status="failed",
+        dialogue_action="respond_only",
+    )
+
+
 def handle_tool_results(state: LLMState, runtime) -> dict[str, Any]:
     llm: LLMWrapper = runtime.context.llm
     tool_results = state.get("tool_results", [])
@@ -2372,43 +2635,26 @@ def handle_tool_results(state: LLMState, runtime) -> dict[str, Any]:
     last_result = tool_results[-1]
     route_group = state.get("route_group") or state.get("metadata", {}).get("group", "conversation")
     metadata_subtask = str(state.get("metadata", {}).get("subtask", "") or "")
+    verification_result: dict[str, Any] | None = None
 
     if route_group == "media" and last_result.get("tool") == "youtube_search":
         media_followup = _handle_media_search_results({**state, "session_state": session_state}, last_result)
         if media_followup is not None:
             return media_followup
 
-    if route_group == "information_query":
-        result_payload = last_result.get("result", {})
-        ambiguity_hint = result_payload.get("ambiguity_hint")
-        if isinstance(ambiguity_hint, dict) and ambiguity_hint.get("should_clarify") and ambiguity_hint.get("question"):
-            question = str(ambiguity_hint.get("question"))
-            session_state = _set_active_pending(
-                session_state,
-                group="information_query",
-                return_mode=state.get("route_return_mode", "conversation"),
-                kind="clarification",
-                question=question,
-                original_user_input=state.get("task_input") or state.get("text_input", ""),
-                subtask="search_information",
-                missing_fields=ambiguity_hint.get("missing_fields", []),
-                context={"options": ambiguity_hint.get("options", [])},
-            )
-            return _make_update(
-                state=state,
-                response_text=question,
-                session_state=session_state,
-                group="information_query",
-                subtask="search_information",
-                confidence=0.75,
-                task_status="needs_clarification",
-                dialogue_action="ask_clarification",
-                missing_fields=ambiguity_hint.get("missing_fields", []),
-            )
-
     failures = [item for item in tool_results if item.get("result", {}).get("status") != "success"]
     if failures and len(failures) == len(tool_results):
         message = failures[-1].get("result", {}).get("message") or "Có lỗi xảy ra khi thực hiện yêu cầu."
+        if route_group == "productivity":
+            synthesized_failure = _synthesize_failed_tool_turn(
+                state,
+                runtime,
+                session_state=session_state,
+                route_group=route_group,
+                fallback_message=message,
+            )
+            if synthesized_failure is not None:
+                return synthesized_failure
         return _make_update(
             state=state,
             response_text=message,
@@ -2419,6 +2665,108 @@ def handle_tool_results(state: LLMState, runtime) -> dict[str, Any]:
             task_status="failed",
             dialogue_action="respond_only",
         )
+
+    if route_group == "information_query":
+        context_strings = _build_context_strings(session_state, route_group)
+        verification_result = {
+            "decision": "answer",
+            "assistant_text": "",
+            "reason": "default_answer",
+            "confidence": 0.5,
+            "missing_fields": [],
+            "refined_query": "",
+            "answer_style": "balanced",
+            "follow_up_mode": "none",
+            "should_strip_follow_up_offer": True,
+            "answer_outline": [],
+        }
+        try:
+            verification_result = llm.verify_information_result(
+                user_input=state.get("task_input") or state.get("text_input", ""),
+                draft_response=state.get("response_text", ""),
+                tool_results=tool_results,
+                response_preferences=_response_preferences_text(state.get("user_profile", {})),
+                task_summary=context_strings["task_summary"],
+                task_transcript=context_strings["task_transcript"],
+                conversation_summary=context_strings["conversation_summary"],
+                conversation_transcript=context_strings["conversation_transcript"],
+                session_mode=session_state.get("mode", "conversation"),
+                current_time=state.get("current_time") or get_current_time_string(),
+            )
+        except Exception as exc:
+            logger.warning("information_result_verifier_failed | error=%s", exc)
+
+        log_kv(
+            logger,
+            logging.INFO,
+            "information_result_verified",
+            user_input=state.get("task_input") or state.get("text_input", ""),
+            decision=verification_result.get("decision"),
+            reason=verification_result.get("reason", ""),
+            confidence=verification_result.get("confidence", 0.5),
+            refined_query=verification_result.get("refined_query", ""),
+            answer_style=verification_result.get("answer_style", "balanced"),
+            follow_up_mode=verification_result.get("follow_up_mode", "none"),
+            missing_fields=verification_result.get("missing_fields", []),
+        )
+
+        if verification_result.get("decision") == "clarify":
+            question = (
+                verification_result.get("assistant_text")
+                or str(last_result.get("result", {}).get("ambiguity_hint", {}).get("question", "") or "")
+                or "Bạn muốn mình làm rõ thêm thông tin nào?"
+            )
+            missing_fields = verification_result.get("missing_fields", [])
+            options = []
+            ambiguity_hint = last_result.get("result", {}).get("ambiguity_hint")
+            if isinstance(ambiguity_hint, dict):
+                options = ambiguity_hint.get("options", [])
+                if not missing_fields:
+                    missing_fields = ambiguity_hint.get("missing_fields", [])
+            session_state = _set_active_pending(
+                session_state,
+                group="information_query",
+                return_mode=state.get("route_return_mode", "conversation"),
+                kind="clarification",
+                question=question,
+                original_user_input=state.get("task_input") or state.get("text_input", ""),
+                subtask="search_information",
+                missing_fields=missing_fields,
+                context={"options": options},
+            )
+            return _make_update(
+                state=state,
+                response_text=question,
+                session_state=session_state,
+                group="information_query",
+                subtask="search_information",
+                confidence=verification_result.get("confidence", 0.75),
+                task_status="needs_clarification",
+                dialogue_action="ask_clarification",
+                missing_fields=missing_fields,
+            )
+
+        refined_query = str(verification_result.get("refined_query", "") or "").strip()
+        original_query = " ".join(str(state.get("task_input") or state.get("text_input", "") or "").split()).strip()
+        if verification_result.get("decision") == "refine_search" and refined_query and refined_query != original_query:
+            return _make_update(
+                state=state,
+                response_text="Mình tìm lại theo hướng phù hợp hơn.",
+                session_state=_ensure_active_task(
+                    session_state,
+                    group="information_query",
+                    return_mode=state.get("route_return_mode", "conversation"),
+                    subtask="search_information",
+                ),
+                group="information_query",
+                subtask="search_information",
+                confidence=verification_result.get("confidence", 0.8),
+                task_status="in_progress",
+                dialogue_action="use_tools",
+                tool_calls=[{"name": "web_search", "parameters": {"query": refined_query, "max_results": 5}}],
+                task_input=original_query,
+                extra_metadata={"refined_query": refined_query, "verify_reason": verification_result.get("reason", "")},
+            )
 
     if route_group == "personalization":
         reset_request = _extract_personal_data_reset_request(
@@ -2477,12 +2825,29 @@ def handle_tool_results(state: LLMState, runtime) -> dict[str, Any]:
             )
 
     context_strings = _build_context_strings(session_state, route_group)
+    answer_policy = (
+        {
+            "decision": verification_result.get("decision"),
+            "answer_style": verification_result.get("answer_style", "balanced"),
+            "follow_up_mode": verification_result.get("follow_up_mode", "none"),
+            "should_strip_follow_up_offer": verification_result.get("should_strip_follow_up_offer", True),
+            "answer_outline": verification_result.get("answer_outline", []),
+            "reason": verification_result.get("reason", ""),
+        }
+        if route_group == "information_query" and verification_result
+        else {}
+    )
     synthesis_result = _normalize_tool_synthesis_output(
         route_group,
         llm.synthesize_tool_results(
             group=route_group,
             user_input=state.get("task_input") or state.get("text_input", ""),
-            draft_response=state.get("response_text", ""),
+            draft_response=(
+                verification_result.get("assistant_text", "")
+                if route_group == "information_query"
+                else state.get("response_text", "")
+            ),
+            answer_policy=answer_policy,
             tool_results=tool_results,
             response_preferences=_response_preferences_text(state.get("user_profile", {})),
             task_summary=context_strings["task_summary"],
@@ -2494,6 +2859,29 @@ def handle_tool_results(state: LLMState, runtime) -> dict[str, Any]:
     )
 
     response_text = synthesis_result.get("assistant_text") or state.get("response_text", "")
+    if (
+        route_group == "information_query"
+        and verification_result
+        and verification_result.get("decision") == "answer"
+        and verification_result.get("should_strip_follow_up_offer", True)
+        and _looks_like_follow_up_offer(response_text)
+    ):
+        response_text = _trim_trailing_follow_up_offer(response_text)
+        synthesis_result["assistant_text"] = response_text
+    if (
+        route_group == "information_query"
+        and verification_result
+        and verification_result.get("decision") == "answer"
+        and synthesis_result.get("dialogue_action") == "ask_clarification"
+        and (
+            _looks_like_follow_up_offer(response_text)
+            or not synthesis_result.get("missing_fields")
+        )
+    ):
+        synthesis_result["dialogue_action"] = "respond_only"
+        synthesis_result["missing_fields"] = []
+        response_text = _trim_trailing_follow_up_offer(response_text)
+        synthesis_result["assistant_text"] = response_text
     if synthesis_result.get("dialogue_action") == "ask_clarification":
         session_state = _set_active_pending(
             session_state,

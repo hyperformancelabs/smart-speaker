@@ -1,8 +1,9 @@
 import sys
+import logging
 import re
 import unicodedata
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -51,8 +52,33 @@ app.config["JSON_SORT_KEYS"] = False
 
 db.init_app(app)
 
+logger = logging.getLogger(__name__)
+
+
+def apply_runtime_schema_migrations() -> None:
+    statements = (
+        "ALTER TABLE alarms ADD COLUMN IF NOT EXISTS schedule_type VARCHAR(20)",
+        "ALTER TABLE alarms ADD COLUMN IF NOT EXISTS scheduled_for TIMESTAMPTZ",
+        "ALTER TABLE alarms ADD COLUMN IF NOT EXISTS offset_seconds INTEGER",
+        "UPDATE alarms SET schedule_type = 'time' WHERE schedule_type IS NULL",
+        "ALTER TABLE alarms ALTER COLUMN schedule_type SET DEFAULT 'time'",
+        "ALTER TABLE alarms ALTER COLUMN schedule_type SET NOT NULL",
+        "ALTER TABLE alarms ALTER COLUMN time DROP NOT NULL",
+        "ALTER TABLE alarms DROP CONSTRAINT IF EXISTS chk_alarms_schedule_type",
+        (
+            "ALTER TABLE alarms ADD CONSTRAINT chk_alarms_schedule_type "
+            "CHECK (schedule_type IN ('time', 'datetime', 'relative'))"
+        ),
+    )
+    with db.engine.begin() as connection:
+        for statement in statements:
+            connection.execute(text(statement))
+    logger.info("runtime_schema_migrations_applied | statements=%d", len(statements))
+
+
 with app.app_context():
     db.create_all()
+    apply_runtime_schema_migrations()
 
 
 @app.errorhandler(404)
@@ -62,6 +88,9 @@ def not_found(error):
 
 @app.errorhandler(500)
 def server_error(error):
+    db.session.rollback()
+    original_error = getattr(error, "original_exception", None) or error
+    logger.exception("database_server_error | error=%r", original_error)
     return jsonify({"error": "Server error"}), 500
 
 
@@ -253,6 +282,32 @@ def user_has_complete_profile(user: User) -> bool:
     return bool(user.user_name and user.user_password and user.name)
 
 
+def _timer_is_expired(timer: Timer, *, now: datetime | None = None) -> bool:
+    if not timer.active:
+        return False
+    if not timer.started_at or int(timer.duration_seconds or 0) <= 0:
+        return False
+    effective_now = now or utcnow()
+    return timer.started_at + timedelta(seconds=int(timer.duration_seconds)) <= effective_now
+
+
+def _sync_expired_timers(user: User) -> int:
+    updated_count = 0
+    current_time = utcnow()
+    for timer in user.timers:
+        if _timer_is_expired(timer, now=current_time):
+            timer.active = False
+            updated_count += 1
+    if updated_count:
+        db.session.commit()
+        logger.info(
+            "expired_timers_synchronized | user_id=%r | count=%d",
+            str(user.user_id),
+            updated_count,
+        )
+    return updated_count
+
+
 def upsert_user_registration(nfc_tag_id: str, user_name: str, user_password: str, name: str):
     existing_user = User.query.filter_by(nfc_tag_id=nfc_tag_id).first()
 
@@ -312,7 +367,7 @@ def _normalize_alarm_fields(data: dict, *, partial: bool = False):
     if "label" in data or not partial:
         label = normalize_optional_text(data.get("label"))
         if not partial and not label:
-            return None, "Missing label"
+            label = "Báo thức"
         if label is not None:
             normalized["label"] = label
 
@@ -609,10 +664,35 @@ def create_alarm(nfc_tag_id: str):
     if error_message:
         return jsonify({"error": error_message}), 400
 
-    alarm = Alarm(user_id=user.user_id, **normalized_fields)
-    db.session.add(alarm)
-    db.session.commit()
-    return jsonify(alarm.to_dict()), 201
+    logger.info(
+        "create_alarm_request | nfc_tag_id=%r | user_id=%r | payload=%r | normalized_fields=%r",
+        nfc_tag_id,
+        str(user.user_id),
+        data,
+        normalized_fields,
+    )
+    try:
+        alarm = Alarm(user_id=user.user_id, **normalized_fields)
+        db.session.add(alarm)
+        db.session.commit()
+        response_payload = alarm.to_dict()
+        logger.info(
+            "create_alarm_succeeded | nfc_tag_id=%r | alarm_id=%r | response=%r",
+            nfc_tag_id,
+            response_payload.get("alarm_id"),
+            response_payload,
+        )
+        return jsonify(response_payload), 201
+    except Exception:
+        db.session.rollback()
+        logger.exception(
+            "create_alarm_failed | nfc_tag_id=%r | user_id=%r | payload=%r | normalized_fields=%r",
+            nfc_tag_id,
+            str(user.user_id),
+            data,
+            normalized_fields,
+        )
+        return jsonify({"error": "Server error"}), 500
 
 
 @app.route("/api/users/<nfc_tag_id>/alarms/<alarm_id>", methods=["PATCH"])
@@ -665,6 +745,7 @@ def list_timers(nfc_tag_id: str):
     user = get_user_or_404(nfc_tag_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
+    _sync_expired_timers(user)
     timers = [timer.to_dict() for timer in user.timers if timer.active]
     return jsonify({"timers": timers}), 200
 
@@ -674,6 +755,7 @@ def start_timer(nfc_tag_id: str):
     user = get_user_or_404(nfc_tag_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
+    _sync_expired_timers(user)
 
     data = request.get_json(silent=True) or {}
     duration_str = data.get("duration")
@@ -698,6 +780,7 @@ def update_timer(nfc_tag_id: str, timer_id: str):
     user = get_user_or_404(nfc_tag_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
+    _sync_expired_timers(user)
 
     timer_uuid = parse_uuid_param(timer_id)
     if not timer_uuid:

@@ -222,12 +222,34 @@ def extract_json_from_response(response_text: str) -> dict[str, Any] | None:
         except (TypeError, ValueError, json.JSONDecodeError):
             pass
 
-    json_match = re.search(r"\{.*\}", response_text, re.DOTALL)
-    if json_match:
-        try:
-            return json.loads(json_match.group())
-        except (TypeError, ValueError, json.JSONDecodeError):
-            pass
+    first_brace = response_text.find("{")
+    if first_brace >= 0:
+        depth = 0
+        in_string = False
+        escaped = False
+        for index in range(first_brace, len(response_text)):
+            character = response_text[index]
+            if escaped:
+                escaped = False
+                continue
+            if character == "\\":
+                escaped = True
+                continue
+            if character == '"':
+                in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if character == "{":
+                depth += 1
+            elif character == "}":
+                depth -= 1
+                if depth == 0:
+                    candidate = response_text[first_brace : index + 1]
+                    try:
+                        return json.loads(candidate)
+                    except (TypeError, ValueError, json.JSONDecodeError):
+                        break
 
     return None
 
@@ -245,6 +267,32 @@ def build_tool_context_string(available_tools: list[str]) -> str:
     tool_descriptions = []
     for tool in TOOLS_DEFINITIONS:
         if tool["name"] in available_tools:
-            tool_descriptions.append(f"- {tool['name']}: {tool['description']}")
+            input_schema = tool.get("input_schema", {}) if isinstance(tool.get("input_schema"), dict) else {}
+            properties = input_schema.get("properties", {}) if isinstance(input_schema.get("properties"), dict) else {}
+            required_fields = set(input_schema.get("required", [])) if isinstance(input_schema.get("required"), list) else set()
+
+            tool_lines = [f"- {tool['name']}: {tool['description']}"]
+            if not properties:
+                tool_lines.append("  parameters: none")
+            else:
+                tool_lines.append("  parameters:")
+                for field_name, field_schema in properties.items():
+                    if not isinstance(field_schema, dict):
+                        field_schema = {}
+                    field_type = field_schema.get("type", "any")
+                    if isinstance(field_type, list):
+                        field_type = "|".join(str(item) for item in field_type)
+                    enum_values = field_schema.get("enum")
+                    enum_text = (
+                        f"; enum={', '.join(str(item) for item in enum_values)}"
+                        if isinstance(enum_values, list) and enum_values
+                        else ""
+                    )
+                    required_text = "required" if field_name in required_fields else "optional"
+                    description = str(field_schema.get("description", "") or "").strip() or "No description."
+                    tool_lines.append(
+                        f"    - {field_name} ({field_type}, {required_text}){enum_text}: {description}"
+                    )
+            tool_descriptions.append("\n".join(tool_lines))
 
     return "\n".join(tool_descriptions)

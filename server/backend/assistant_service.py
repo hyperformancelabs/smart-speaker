@@ -120,11 +120,18 @@ def run_assistant_turn(payload: dict[str, Any]) -> dict[str, Any]:
         text_input=text_input,
     )
 
-    if nfc_tag_id and not user_id:
+    if nfc_tag_id:
         user_profile = get_user_by_nfc_tag(nfc_tag_id)
         if user_profile and user_profile.get("user_id"):
             user_id = str(user_profile["user_id"])
             request_payload["user_id"] = user_id
+            log_kv(
+                logger,
+                logging.INFO,
+                "assistant_user_resolved_from_nfc",
+                nfc_tag_id=nfc_tag_id,
+                resolved_user_id=user_id,
+            )
 
     session_key = resolve_session_key(
         nfc_tag_id=nfc_tag_id,
@@ -267,6 +274,23 @@ def run_assistant_turn(payload: dict[str, Any]) -> dict[str, Any]:
         capture_token=capture_token,
         assistant_status=final_output.get("status"),
         route_group=((final_output.get("route") or {}) if isinstance(final_output.get("route"), dict) else {}).get("group"),
+        route_subtask=((final_output.get("route") or {}) if isinstance(final_output.get("route"), dict) else {}).get("subtask"),
+        pending_kind=((final_output.get("dialog") or {}) if isinstance(final_output.get("dialog"), dict) else {}).get("pending_kind"),
+        tool_output_count=len(final_output.get("tool_outputs", [])) if isinstance(final_output.get("tool_outputs"), list) else 0,
+        tools_called=[
+            item.get("tool")
+            for item in final_output.get("tool_outputs", [])
+            if isinstance(item, dict) and item.get("tool")
+        ]
+        if isinstance(final_output.get("tool_outputs"), list)
+        else [],
+        command_types=[
+            item.get("type")
+            for item in final_output.get("commands", [])
+            if isinstance(item, dict) and item.get("type")
+        ]
+        if isinstance(final_output.get("commands"), list)
+        else [],
         has_tts=bool(playback and isinstance(playback.get("tts"), dict) and playback.get("tts", {}).get("url")),
         has_media=bool(playback and isinstance(playback.get("media_after_tts"), dict) and playback.get("media_after_tts", {}).get("stream_url")),
         playback_error=playback_error,
