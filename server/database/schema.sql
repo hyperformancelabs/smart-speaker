@@ -138,4 +138,21 @@ CREATE TABLE IF NOT EXISTS interaction_logs (
 CREATE INDEX IF NOT EXISTS idx_logs_user_time ON interaction_logs (user_id, timestamp);
 CREATE INDEX IF NOT EXISTS idx_logs_intent ON interaction_logs (intent);
 
+CREATE TABLE IF NOT EXISTS media_history (
+    media_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL DEFAULT 'Media stream',
+    public_stream_url VARCHAR(2000) NOT NULL,
+    source_url VARCHAR(2000),
+    source VARCHAR(100),
+    webpage_url VARCHAR(2000),
+    thumbnail_url VARCHAR(2000),
+    play_count INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_played_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_media_history_user ON media_history (user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_media_history_user_url ON media_history (user_id, public_stream_url);
+
 COMMIT;

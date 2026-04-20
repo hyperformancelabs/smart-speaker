@@ -492,6 +492,8 @@ def start_audio_capture():
         "audio_capture_start_requested",
         ws_host=ws_host,
         ws_port=capture_request.ws_port,
+        device_id=capture_request.device_id,
+        nfc_tag_id=capture_request.nfc_tag_id,
         first_utterance_state=capture_request.first_utterance_state.value,
         no_speech_timeout_seconds=no_speech_timeout_seconds,
         public_base_url=public_base_url,

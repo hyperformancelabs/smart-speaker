@@ -125,7 +125,8 @@ def youtube_stream_with(
             url=url,
             mode=mode,
         )
-        return _build_youtube_stream_result(stream_info, query=query, mode=mode)
+        result = _build_youtube_stream_result(stream_info, query=query, mode=mode)
+        return result
     except Exception as exc:
         return {
             "status": "error",

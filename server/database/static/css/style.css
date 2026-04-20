@@ -624,3 +624,29 @@ input:checked + .slider:before {
   .toast-container { left: 10px; right: 10px; top: 10px; }
   .toast { min-width: 0; width: 100%; box-sizing: border-box; }
 }
+
+/* Media History */
+.media-history-list { display: flex; flex-direction: column; }
+.media-history-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1rem 1.25rem; gap: 1rem;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}
+.media-history-item:last-child { border-bottom: none; }
+.media-history-item:hover { background: rgba(255,255,255,0.03); }
+.media-history-info { flex: 1; min-width: 0; }
+.media-history-title {
+  font-weight: 500; color: var(--text-main);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.media-history-meta {
+  display: flex; align-items: center; gap: 0.5rem;
+  margin-top: 0.25rem; font-size: 0.8rem; color: var(--text-muted);
+}
+.media-badge {
+  background: rgba(255,0,0,0.12); color: #ff4444;
+  padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.7rem; font-weight: 600;
+}
+.media-history-actions { display: flex; align-items: center; gap: 0.25rem; flex-shrink: 0; }
+.media-history-actions .btn-icon { width: 36px; height: 36px; border-radius: var(--radius-sm); }

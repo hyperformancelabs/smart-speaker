@@ -187,7 +187,8 @@ def execute_tool(tool_name: str, parameters: dict[str, Any], nfc_tag_id: str = N
         }
 
     try:
-        return tool_func(**call_parameters)
+        result = tool_func(**call_parameters)
+        return result
     except Exception as exc:
         return {
             "status": "error",

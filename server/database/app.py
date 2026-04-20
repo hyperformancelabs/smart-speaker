@@ -23,7 +23,7 @@ BASE_DIR = Path(__file__).resolve().parent
 ENV_FILE = BASE_DIR / ".env"
 ENV_VALUES = dotenv_values(ENV_FILE)
 
-from models import Alarm, InteractionLog, List, ListItem, Timer, User, db
+from models import Alarm, InteractionLog, List, ListItem, MediaHistory, Timer, User, db
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.json.ensure_ascii = False
@@ -1009,6 +1009,86 @@ def create_log():
     db.session.add(log)
     db.session.commit()
     return jsonify({"log_id": str(log.log_id)}), 201
+
+
+@app.route("/api/users/<nfc_tag_id>/media-history", methods=["GET"])
+def list_media_history(nfc_tag_id: str):
+    user = get_user_or_404(nfc_tag_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    limit = request.args.get("limit", 50, type=int)
+    records = (
+        MediaHistory.query.filter_by(user_id=user.user_id)
+        .order_by(MediaHistory.last_played_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return jsonify({"media_history": [r.to_dict() for r in records]}), 200
+
+
+@app.route("/api/users/<nfc_tag_id>/media-history", methods=["POST"])
+def upsert_media_history(nfc_tag_id: str):
+    user = get_user_or_404(nfc_tag_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+    public_stream_url = normalize_optional_text(data.get("public_stream_url"))
+    if not public_stream_url:
+        return jsonify({"error": "Missing public_stream_url"}), 400
+
+    existing = MediaHistory.query.filter_by(
+        user_id=user.user_id, public_stream_url=public_stream_url
+    ).first()
+
+    if existing:
+        existing.play_count = (existing.play_count or 0) + 1
+        existing.last_played_at = utcnow()
+        if data.get("title") is not None:
+            existing.title = data["title"]
+        if data.get("source") is not None:
+            existing.source = data["source"]
+        if data.get("webpage_url") is not None:
+            existing.webpage_url = data["webpage_url"]
+        if data.get("thumbnail_url") is not None:
+            existing.thumbnail_url = data["thumbnail_url"]
+        db.session.commit()
+        return jsonify(existing.to_dict()), 200
+
+    record = MediaHistory(
+        user_id=user.user_id,
+        public_stream_url=public_stream_url,
+        title=normalize_optional_text(data.get("title")) or "Media stream",
+        source_url=normalize_optional_text(data.get("source_url")),
+        source=normalize_optional_text(data.get("source")),
+        webpage_url=normalize_optional_text(data.get("webpage_url")),
+        thumbnail_url=normalize_optional_text(data.get("thumbnail_url")),
+    )
+    db.session.add(record)
+    db.session.commit()
+    return jsonify(record.to_dict()), 201
+
+
+@app.route("/api/users/<nfc_tag_id>/media-history/<media_id>", methods=["DELETE"])
+def delete_media_history(nfc_tag_id: str, media_id: str):
+    user = get_user_or_404(nfc_tag_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    media_uuid = parse_uuid_param(media_id)
+    if not media_uuid:
+        return jsonify({"error": "Invalid media_id"}), 400
+
+    record = MediaHistory.query.filter_by(
+        media_id=media_uuid, user_id=user.user_id
+    ).first()
+    if not record:
+        return jsonify({"error": "Media history not found"}), 404
+
+    db.session.delete(record)
+    db.session.commit()
+    return jsonify({"message": "Media history deleted"}), 200
 
 
 @app.route("/health", methods=["GET"])

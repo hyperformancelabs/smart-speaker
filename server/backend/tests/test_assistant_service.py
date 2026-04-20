@@ -133,6 +133,72 @@ class AssistantServiceTests(unittest.TestCase):
 
         self.assertEqual(captured_payload["user_id"], "resolved-user-uuid")
 
+    def test_run_assistant_turn_recovers_nfc_tag_id_from_device_session_cache(self) -> None:
+        captured_payload: dict[str, object] = {}
+
+        def fake_run_pipeline(payload: dict[str, object]) -> dict[str, object]:
+            captured_payload.update(payload)
+            return {
+                "tts_text": "Xin chào",
+                "status": "completed",
+                "route": {"group": "conversation"},
+                "session_state": {"mode": "conversation"},
+                "commands": [],
+            }
+
+        synthesized = SimpleNamespace(
+            text="Xin chào",
+            spoken_text="Xin chao",
+            file_path=Path("/tmp/fake_tts.wav"),
+            duration_seconds=1.2,
+            voice_name="voice-a",
+            sample_rate=16000,
+            channels=1,
+        )
+
+        cached_session_state = {
+            "mode": "conversation",
+            "profile_cache": {
+                "nfc_tag_id": "15:CF:D0:06",
+                "name": "Phat",
+                "memory": ["thích nhạc lofi"],
+            },
+        }
+
+        with patch.object(assistant_service.device_session_store, "get", return_value=cached_session_state), patch.object(
+            assistant_service.device_session_store,
+            "set",
+        ), patch.object(
+            assistant_service,
+            "run_pipeline",
+            side_effect=fake_run_pipeline,
+        ), patch.object(
+            assistant_service,
+            "get_user_by_nfc_tag",
+            return_value={"user_id": "resolved-from-cache"},
+        ), patch.object(
+            assistant_service.tts_service,
+            "synthesize",
+            return_value=synthesized,
+        ), patch.object(
+            assistant_service.asset_registry,
+            "register_tts_file",
+            return_value=SimpleNamespace(asset_id="tts_cache"),
+        ), patch.object(
+            assistant_service.asset_registry,
+            "build_tts_url",
+            return_value="http://localhost/tts_cache.wav",
+        ):
+            assistant_service.run_assistant_turn(
+                {
+                    "device_id": "esp-1",
+                    "text_input": "bạn nhớ gì về tôi",
+                }
+            )
+
+        self.assertEqual(captured_payload["nfc_tag_id"], "15:CF:D0:06")
+        self.assertEqual(captured_payload["user_id"], "resolved-from-cache")
+
     def test_run_assistant_turn_enriches_media_commands_for_device(self) -> None:
         media_record = SimpleNamespace(
             asset_id="media_456",
@@ -260,6 +326,36 @@ class AssistantServiceTests(unittest.TestCase):
         self.assertEqual(
             playback["transcode_source_url"],
             "https://rr1---sn.example.googlevideo.com/videoplayback?id=abc",
+        )
+
+    def test_resolve_media_history_stream_url_prefers_public_proxy_path(self) -> None:
+        stream_url = assistant_service._resolve_media_history_stream_url(
+            {
+                "proxy_path": "/api/media/youtube/stream?video_id=abc&mode=audio",
+                "proxy_url": "http://localhost:8387/api/media/youtube/stream?video_id=abc&mode=audio",
+                "stream_url": "http://localhost:8387/api/assets/media/media_123.wav",
+            },
+            public_base_url="http://192.168.1.8:8387",
+        )
+
+        self.assertEqual(
+            stream_url,
+            "http://192.168.1.8:8387/api/media/youtube/stream?video_id=abc&mode=audio",
+        )
+
+    def test_resolve_media_history_stream_url_falls_back_to_proxy_url_without_public_base_url(self) -> None:
+        stream_url = assistant_service._resolve_media_history_stream_url(
+            {
+                "proxy_path": "/api/media/youtube/stream?video_id=abc&mode=audio",
+                "proxy_url": "http://localhost:8387/api/media/youtube/stream?video_id=abc&mode=audio",
+                "stream_url": "http://localhost:8387/api/assets/media/media_123.wav",
+            },
+            public_base_url=None,
+        )
+
+        self.assertEqual(
+            stream_url,
+            "http://localhost:8387/api/media/youtube/stream?video_id=abc&mode=audio",
         )
 
     def test_run_assistant_turn_passes_public_base_url_to_asset_registry(self) -> None:

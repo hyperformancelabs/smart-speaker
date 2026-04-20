@@ -138,6 +138,28 @@ class DebugRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         ensure_debug_user_mock.assert_called_once_with("15:CF:D0:06")
 
+    def test_audio_start_passes_nfc_tag_id_into_capture_request(self) -> None:
+        with patch.object(
+            backend_app_module.capture_manager,
+            "start",
+            return_value={"state": "started"},
+        ) as capture_start_mock:
+            response = self.client.post(
+                "/api/audio/start",
+                json={
+                    "ws_host": "192.168.1.11",
+                    "ws_port": 81,
+                    "capture_token": "cap-123",
+                    "nfc_tag_id": "15:CF:D0:06",
+                    "device_id": "esp-1",
+                },
+            )
+
+        self.assertEqual(response.status_code, 202)
+        capture_request = capture_start_mock.call_args.args[0]
+        self.assertEqual(capture_request.nfc_tag_id, "15:CF:D0:06")
+        self.assertEqual(capture_request.device_id, "esp-1")
+
 
 if __name__ == "__main__":
     unittest.main()

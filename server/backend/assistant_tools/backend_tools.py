@@ -951,3 +951,20 @@ def get_memory(nfc_tag_id: str) -> dict[str, Any]:
         return {"status": "success", "memories": data.get("memory", [])}
     except Exception as exc:
         return {"status": "error", "message": f"Failed to get memory: {str(exc)}"}
+
+
+def list_media_history(nfc_tag_id: str) -> dict[str, Any]:
+    try:
+        data = backend_json("GET", f"/api/users/{nfc_tag_id}/media-history")
+        items = data.get("media_history", [])
+        return {"status": "success", "media_history": items, "count": len(items)}
+    except Exception as exc:
+        return _productivity_error("lấy lịch sử media", exc)
+
+
+def delete_media_history(nfc_tag_id: str, media_id: str) -> dict[str, Any]:
+    try:
+        backend_request("DELETE", f"/api/users/{nfc_tag_id}/media-history/{media_id}")
+        return {"status": "success", "media_id": media_id, "deleted": True}
+    except Exception as exc:
+        return _productivity_error("xóa lịch sử media", exc)

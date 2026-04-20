@@ -65,6 +65,7 @@ class User(db.Model):
     timers = db.relationship("Timer", backref="user", lazy=True, cascade="all, delete-orphan")
     lists = db.relationship("List", backref="user", lazy=True, cascade="all, delete-orphan")
     logs = db.relationship("InteractionLog", backref="user", lazy=True, cascade="all, delete-orphan")
+    media_history = db.relationship("MediaHistory", backref="user", lazy=True, cascade="all, delete-orphan")
 
     def to_dict(self):
         return {
@@ -242,6 +243,46 @@ class ListItem(db.Model):
             "item_id": str(self.item_id),
             "content": self.content,
             "completed": self.completed,
+        }
+
+
+class MediaHistory(db.Model):
+    __tablename__ = "media_history"
+
+    media_id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = db.Column(UUID(as_uuid=True), db.ForeignKey("users.user_id"), nullable=False, index=True)
+    title = db.Column(db.String(255), nullable=False, default="Media stream")
+    public_stream_url = db.Column(db.String(2000), nullable=False)
+    source_url = db.Column(db.String(2000))
+    source = db.Column(db.String(100))
+    webpage_url = db.Column(db.String(2000))
+    thumbnail_url = db.Column(db.String(2000))
+    play_count = db.Column(db.Integer, nullable=False, default=1)
+    created_at = db.Column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utcnow,
+        server_default=func.now(),
+    )
+    last_played_at = db.Column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utcnow,
+        server_default=func.now(),
+    )
+
+    def to_dict(self):
+        return {
+            "media_id": str(self.media_id),
+            "title": self.title,
+            "public_stream_url": self.public_stream_url,
+            "source_url": self.source_url,
+            "source": self.source,
+            "webpage_url": self.webpage_url,
+            "thumbnail_url": self.thumbnail_url,
+            "play_count": self.play_count,
+            "created_at": self.created_at.isoformat(),
+            "last_played_at": self.last_played_at.isoformat(),
         }
 
 

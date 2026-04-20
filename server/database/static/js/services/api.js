@@ -100,5 +100,6 @@ export const ListAPI = {
 };
 
 export const MediaAPI = {
-    getAll: async () => []
+    getAll: async () => (await fetchAPI(`/api/users/${encodeSessionNfcTagId()}/media-history`)).media_history || [],
+    delete: (id) => fetchAPI(`/api/users/${encodeSessionNfcTagId()}/media-history/${id}`, 'DELETE')
 };

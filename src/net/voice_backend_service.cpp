@@ -11,6 +11,7 @@
 
 #include "app_config.h"
 #include "net/wifi_service.h"
+#include "rtos/app_runtime.h"
 #include "rtos/app_tasks.h"
 #include "secrets.h"
 
@@ -156,11 +157,16 @@ bool messageMatchesActiveCaptureToken(const String &message) {
     return activeCaptureTokenEquals(captureToken);
 }
 
+bool hasUsableNfcTagId(const char *nfcTagId) {
+    return nfcTagId != nullptr && nfcTagId[0] != '\0' && strcmp(nfcTagId, "(no card)") != 0;
+}
+
 String buildAudioStartPayload(const String &captureToken) {
     const IPAddress ip = wifiGetIpAddress();
     if (ip == IPAddress()) {
         return "";
     }
+    const AppState snapshot = app_runtime::loadAppStateSnapshot();
 
     String payload = "{";
     payload += "\"ws_host\":\"";
@@ -178,6 +184,12 @@ String buildAudioStartPayload(const String &captureToken) {
     payload += "\"capture_token\":\"";
     payload += captureToken;
     payload += "\"";
+    if (hasUsableNfcTagId(snapshot.lastUid)) {
+        payload += ",";
+        payload += "\"nfc_tag_id\":\"";
+        payload += snapshot.lastUid;
+        payload += "\"";
+    }
     payload += "}";
     return payload;
 }

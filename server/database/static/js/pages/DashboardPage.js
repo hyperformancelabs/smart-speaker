@@ -57,7 +57,7 @@ export function loadDashboard() {
                         <i class="fa-regular fa-note-sticky"></i> <span>Ghi chú</span>
                     </li>
                     <li id="menu-media" class="nav-item">
-                        <i class="fa-brands fa-youtube"></i> <span>Video</span>
+                        <i class="fa-brands fa-youtube"></i> <span>Media</span>
                     </li>
                     <li id="menu-profile" class="nav-item">
                         <i class="fa-regular fa-user"></i> <span>Cá nhân</span>
@@ -185,7 +185,7 @@ async function renderOverview(silent = false) {
                     <div style="font-size: 2.5rem; color: var(--primary);"><i class="fa-brands fa-youtube" style="color: #ff0000;"></i></div>
                     <div>
                         <div style="font-size: 1.8rem; font-weight: bold; color: var(--text-main);">${totalMedia}</div>
-                        <div style="color: var(--text-muted); font-size: 0.95rem;">Video đã lưu</div>
+                        <div style="color: var(--text-muted); font-size: 0.95rem;">Media history</div>
                     </div>
                 </div>
             </div>
