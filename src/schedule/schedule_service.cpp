@@ -31,7 +31,6 @@
 
 namespace {
 namespace runtime = app_runtime;
-using AudioSessionMode = runtime::AudioSessionMode;
 
 constexpr uint16_t kScheduleConnectTimeoutMs = 2500;
 constexpr uint16_t kScheduleRequestTimeoutMs = 6500;
@@ -503,12 +502,9 @@ void handleDueSchedules() {
         vTaskDelay(pdMS_TO_TICKS(kAlertPauseMs));
     }
 
-    reportConsumedSchedules(dueEntries, dueCount);
     runtime::resetBeepQueue();
     setAlertState(false, false);
-    // Alert is an interrupt path. Restore standby directly so wakeword can recover
-    // without depending on a separate UI state transition.
-    runtime::setAudioSessionMode(AudioSessionMode::WaitWakeword);
+    reportConsumedSchedules(dueEntries, dueCount);
     appRequestExternalAudioSessionState(ExternalAudioSessionState::WaitWakeword);
     armNextScheduleTimer();
 }

@@ -22,7 +22,6 @@
 
 namespace {
 namespace runtime = app_runtime;
-using AudioSessionMode = runtime::AudioSessionMode;
 
 constexpr uint16_t kVoiceBackendConnectTimeoutMs = 2500;
 constexpr uint16_t kVoiceBackendRequestTimeoutMs = 6500;
@@ -392,7 +391,6 @@ bool voiceBackendHandleControlMessage(const char *payload) {
             runtime::resetStreamAudioQueue();
             runtime::storePlaybackAudio(nullptr, 0);
             voiceBackendInvalidateCaptureToken();
-            runtime::setAudioSessionMode(AudioSessionMode::WaitWakeword);
         }
 
         appRequestExternalAudioSessionState(nextState);

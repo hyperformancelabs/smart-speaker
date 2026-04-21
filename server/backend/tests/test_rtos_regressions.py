@@ -24,13 +24,29 @@ class RtosRegressionTests(unittest.TestCase):
         self.assertIn('scheduleRequestSync(lookupRequest.uid, "nfc_login");', source)
         self.assertNotIn('scheduleSyncForUid(lookupRequest.uid, "nfc_login");', source)
 
-    def test_alert_recovery_returns_to_wait_wakeword_instead_of_idle(self) -> None:
+    def test_alert_recovery_requests_wait_wakeword_without_direct_runtime_mutation(self) -> None:
         source = SCHEDULE_SERVICE.read_text(encoding="utf-8")
 
-        self.assertIn("runtime::setAudioSessionMode(AudioSessionMode::WaitWakeword);", source)
+        self.assertIn(
+            "appRequestExternalAudioSessionState(ExternalAudioSessionState::WaitWakeword);",
+            source,
+        )
+        self.assertNotIn("runtime::setAudioSessionMode(AudioSessionMode::WaitWakeword);", source)
         self.assertNotIn("runtime::setAudioSessionMode(AudioSessionMode::Idle);", source)
 
-    def test_voice_backend_terminal_wait_wakeword_clears_capture_and_restores_standby(self) -> None:
+    def test_alert_flag_clears_before_schedule_reporting_blocks_recovery(self) -> None:
+        source = SCHEDULE_SERVICE.read_text(encoding="utf-8")
+
+        report_index = source.index("reportConsumedSchedules(dueEntries, dueCount);")
+        clear_index = source.index("setAlertState(false, false);")
+
+        self.assertLess(
+            clear_index,
+            report_index,
+            "alert state must clear before schedule event reporting so wakeword resumes immediately",
+        )
+
+    def test_voice_backend_terminal_wait_wakeword_clears_capture_without_direct_runtime_mutation(self) -> None:
         source = VOICE_BACKEND_SERVICE.read_text(encoding="utf-8")
 
         self.assertIn('extractJsonBoolField(message, "stop_capture", stopCapture);', source)
@@ -39,7 +55,7 @@ class RtosRegressionTests(unittest.TestCase):
             source,
         )
         self.assertIn("voiceBackendInvalidateCaptureToken();", source)
-        self.assertIn("runtime::setAudioSessionMode(AudioSessionMode::WaitWakeword);", source)
+        self.assertNotIn("runtime::setAudioSessionMode(AudioSessionMode::WaitWakeword);", source)
 
     def test_ui_task_only_consumes_external_state_when_it_can_apply_it(self) -> None:
         source = APP_TASKS.read_text(encoding="utf-8")
