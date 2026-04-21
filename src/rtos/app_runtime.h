@@ -50,6 +50,7 @@ void resetStreamAudioQueue();
 
 void queueBeep(int freq, int durationMs);
 bool waitBeep(BeepRequest &request, TickType_t timeoutTicks);
+void resetBeepQueue();
 
 void queueProfileLookup(const char *uid);
 bool waitProfileLookup(ProfileLookupRequest &request, TickType_t timeoutTicks);

@@ -408,10 +408,6 @@ def run_assistant_turn(payload: dict[str, Any]) -> dict[str, Any]:
             playback_message["capture_token"] = capture_token
         esp_messages.append(playback_message)
 
-    for command in actionable_commands:
-        if command.get("type") in {"alarm", "timer"}:
-            esp_messages.append({"type": "device_command", "command": command})
-
     enriched_output = dict(final_output)
     if playback:
         enriched_output["playback"] = playback

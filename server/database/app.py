@@ -1,10 +1,13 @@
 import sys
 import logging
+import json
 import re
 import unicodedata
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from urllib import error as urllib_error
+from urllib import request as urllib_request
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
@@ -24,6 +27,7 @@ ENV_FILE = BASE_DIR / ".env"
 ENV_VALUES = dotenv_values(ENV_FILE)
 
 from models import Alarm, InteractionLog, List, ListItem, MediaHistory, Timer, User, db
+from device_schedule_protocol import build_device_schedule_sync_text, resolve_alarm_due_at
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.json.ensure_ascii = False
@@ -33,6 +37,9 @@ ALLOWED_REPEAT_VALUES = {"once", "daily", "weekly"}
 ALLOWED_SCHEDULE_TYPES = {"time", "datetime", "relative"}
 
 DATABASE_URL = str(ENV_VALUES.get("DATABASE_URL") or "").strip()
+VOICE_BACKEND_NOTIFY_URL = str(
+    ENV_VALUES.get("VOICE_BACKEND_NOTIFY_URL") or "http://localhost:8387/api/device/schedules/notify"
+).strip()
 if not DATABASE_URL:
     raise RuntimeError(f"DATABASE_URL must be set in {ENV_FILE}.")
 
@@ -110,6 +117,10 @@ def parse_uuid_param(value: str):
 
 def utcnow():
     return datetime.now(timezone.utc)
+
+
+def server_now():
+    return datetime.now().astimezone()
 
 
 def normalize_optional_text(value):
@@ -291,6 +302,33 @@ def _timer_is_expired(timer: Timer, *, now: datetime | None = None) -> bool:
     return timer.started_at + timedelta(seconds=int(timer.duration_seconds)) <= effective_now
 
 
+def _alarm_is_expired(alarm: Alarm, *, now: datetime | None = None) -> bool:
+    if not alarm.enabled:
+        return False
+    repeat = normalize_optional_text(alarm.repeat) or "once"
+    if repeat != "once":
+        return False
+    effective_now = now or server_now()
+    return resolve_alarm_due_at(alarm, now=effective_now) is None
+
+
+def _sync_expired_alarms(user: User) -> int:
+    updated_count = 0
+    current_time = server_now()
+    for alarm in user.alarms:
+        if _alarm_is_expired(alarm, now=current_time):
+            alarm.enabled = False
+            updated_count += 1
+    if updated_count:
+        db.session.commit()
+        logger.info(
+            "expired_alarms_synchronized | user_id=%r | count=%d",
+            str(user.user_id),
+            updated_count,
+        )
+    return updated_count
+
+
 def _sync_expired_timers(user: User) -> int:
     updated_count = 0
     current_time = utcnow()
@@ -306,6 +344,135 @@ def _sync_expired_timers(user: User) -> int:
             updated_count,
         )
     return updated_count
+
+
+def _build_device_schedule_payload_text(user: User) -> str:
+    effective_now = server_now()
+    active_alarms = [alarm for alarm in user.alarms if alarm.enabled]
+    active_timers = [timer for timer in user.timers if timer.active]
+    return build_device_schedule_sync_text(
+        server_now=effective_now,
+        alarms=active_alarms,
+        timers=active_timers,
+        include_overdue_once=True,
+    )
+
+
+def _consume_schedule_event(user: User, *, kind: str, schedule_id: str, event: str) -> tuple[dict, bool]:
+    normalized_kind = normalize_optional_text(kind)
+    normalized_event = normalize_optional_text(event)
+    if normalized_kind not in {"alarm", "timer"}:
+        return {
+            "status": "invalid_kind",
+            "kind": kind,
+            "schedule_id": schedule_id,
+            "event": event,
+        }, False
+
+    if normalized_event not in {"triggered", "completed", "dismissed"}:
+        return {
+            "status": "invalid_event",
+            "kind": normalized_kind,
+            "schedule_id": schedule_id,
+            "event": event,
+        }, False
+
+    schedule_uuid = parse_uuid_param(schedule_id)
+    if not schedule_uuid:
+        return {
+            "status": "invalid_id",
+            "kind": normalized_kind,
+            "schedule_id": schedule_id,
+            "event": normalized_event,
+        }, False
+
+    if normalized_kind == "timer":
+        timer = Timer.query.filter_by(
+            timer_id=schedule_uuid,
+            user_id=user.user_id,
+            active=True,
+        ).first()
+        if timer is None:
+            return {
+                "status": "not_found",
+                "kind": normalized_kind,
+                "schedule_id": schedule_id,
+                "event": normalized_event,
+            }, False
+
+        timer.active = False
+        return {
+            "status": "consumed",
+            "kind": normalized_kind,
+            "schedule_id": str(timer.timer_id),
+            "event": normalized_event,
+        }, True
+
+    alarm = Alarm.query.filter_by(
+        alarm_id=schedule_uuid,
+        user_id=user.user_id,
+        enabled=True,
+    ).first()
+    if alarm is None:
+        return {
+            "status": "not_found",
+            "kind": normalized_kind,
+            "schedule_id": schedule_id,
+            "event": normalized_event,
+        }, False
+
+    if (normalize_optional_text(alarm.repeat) or "once") != "once":
+        return {
+            "status": "ignored_repeat",
+            "kind": normalized_kind,
+            "schedule_id": str(alarm.alarm_id),
+            "event": normalized_event,
+            "repeat": alarm.repeat,
+        }, False
+
+    alarm.enabled = False
+    return {
+        "status": "consumed",
+        "kind": normalized_kind,
+        "schedule_id": str(alarm.alarm_id),
+        "event": normalized_event,
+    }, True
+
+
+def _notify_device_schedule_change(nfc_tag_id: str, *, reason: str) -> None:
+    normalized_nfc_tag_id = normalize_nfc_tag_id(nfc_tag_id)
+    if not normalized_nfc_tag_id or not VOICE_BACKEND_NOTIFY_URL:
+        return
+
+    payload = json.dumps(
+        {
+            "nfc_tag_id": normalized_nfc_tag_id,
+            "reason": reason,
+        }
+    ).encode("utf-8")
+    request_obj = urllib_request.Request(
+        VOICE_BACKEND_NOTIFY_URL,
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib_request.urlopen(request_obj, timeout=3.0) as response:
+            response.read()
+            logger.info(
+                "device_schedule_notify_completed | nfc_tag_id=%r | reason=%r | http_status=%r",
+                normalized_nfc_tag_id,
+                reason,
+                getattr(response, "status", None),
+            )
+    except (urllib_error.URLError, TimeoutError, ValueError):
+        logger.warning(
+            "device_schedule_notify_failed | nfc_tag_id=%r | reason=%r | notify_url=%r",
+            normalized_nfc_tag_id,
+            reason,
+            VOICE_BACKEND_NOTIFY_URL,
+            exc_info=True,
+        )
 
 
 def upsert_user_registration(nfc_tag_id: str, user_name: str, user_password: str, name: str):
@@ -563,6 +730,60 @@ def get_device_profile_status(nfc_tag_id: str):
     return device_name, 200, {"Content-Type": "text/plain; charset=us-ascii"}
 
 
+@app.route("/api/device/users/<nfc_tag_id>/schedule-sync", methods=["GET"])
+def get_device_schedule_sync(nfc_tag_id: str):
+    normalized_nfc_tag_id = normalize_nfc_tag_id(nfc_tag_id)
+    if not normalized_nfc_tag_id:
+        return "invalid nfc_tag_id", 400, {"Content-Type": "text/plain; charset=utf-8"}
+
+    user = get_user_or_404(normalized_nfc_tag_id)
+    if not user:
+        return "not-found", 404, {"Content-Type": "text/plain; charset=utf-8"}
+
+    if not user_has_complete_profile(user):
+        return "incomplete", 412, {"Content-Type": "text/plain; charset=utf-8"}
+
+    payload = _build_device_schedule_payload_text(user)
+    return payload, 200, {"Content-Type": "text/plain; charset=utf-8"}
+
+
+@app.route("/api/device/users/<nfc_tag_id>/schedule-events", methods=["POST"])
+def post_device_schedule_events(nfc_tag_id: str):
+    normalized_nfc_tag_id = normalize_nfc_tag_id(nfc_tag_id)
+    if not normalized_nfc_tag_id:
+        return jsonify({"error": "Invalid nfc_tag_id"}), 400
+
+    user = get_user_or_404(normalized_nfc_tag_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    payload = request.get_json(silent=True) or {}
+    raw_events = payload.get("events")
+    if not isinstance(raw_events, list) or not raw_events:
+        return jsonify({"error": "events must be a non-empty list"}), 400
+
+    results: list[dict] = []
+    changed = False
+    for raw_event in raw_events:
+        if not isinstance(raw_event, dict):
+            results.append({"status": "invalid_payload", "event": raw_event})
+            continue
+
+        result, did_change = _consume_schedule_event(
+            user,
+            kind=str(raw_event.get("kind") or ""),
+            schedule_id=str(raw_event.get("schedule_id") or ""),
+            event=str(raw_event.get("event") or "triggered"),
+        )
+        results.append(result)
+        changed = changed or did_change
+
+    if changed:
+        db.session.commit()
+
+    return jsonify({"events": results, "changed": changed}), 200
+
+
 @app.route("/api/users/<nfc_tag_id>/update", methods=["PATCH"])
 def update_user(nfc_tag_id: str):
     user = get_user_or_404(nfc_tag_id)
@@ -682,6 +903,7 @@ def create_alarm(nfc_tag_id: str):
             response_payload.get("alarm_id"),
             response_payload,
         )
+        _notify_device_schedule_change(user.nfc_tag_id, reason="alarm_created")
         return jsonify(response_payload), 201
     except Exception:
         db.session.rollback()
@@ -718,6 +940,7 @@ def update_alarm(nfc_tag_id: str, alarm_id: str):
         setattr(alarm, field_name, field_value)
 
     db.session.commit()
+    _notify_device_schedule_change(user.nfc_tag_id, reason="alarm_updated")
     return jsonify(alarm.to_dict()), 200
 
 
@@ -737,6 +960,7 @@ def delete_alarm(nfc_tag_id: str, alarm_id: str):
 
     db.session.delete(alarm)
     db.session.commit()
+    _notify_device_schedule_change(user.nfc_tag_id, reason="alarm_deleted")
     return jsonify({"message": "Alarm deleted"}), 200
 
 
@@ -745,7 +969,6 @@ def list_timers(nfc_tag_id: str):
     user = get_user_or_404(nfc_tag_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
-    _sync_expired_timers(user)
     timers = [timer.to_dict() for timer in user.timers if timer.active]
     return jsonify({"timers": timers}), 200
 
@@ -755,7 +978,6 @@ def start_timer(nfc_tag_id: str):
     user = get_user_or_404(nfc_tag_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
-    _sync_expired_timers(user)
 
     data = request.get_json(silent=True) or {}
     duration_str = data.get("duration")
@@ -772,6 +994,7 @@ def start_timer(nfc_tag_id: str):
     )
     db.session.add(timer)
     db.session.commit()
+    _notify_device_schedule_change(user.nfc_tag_id, reason="timer_created")
     return jsonify(timer.to_dict()), 201
 
 
@@ -780,7 +1003,6 @@ def update_timer(nfc_tag_id: str, timer_id: str):
     user = get_user_or_404(nfc_tag_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
-    _sync_expired_timers(user)
 
     timer_uuid = parse_uuid_param(timer_id)
     if not timer_uuid:
@@ -801,6 +1023,7 @@ def update_timer(nfc_tag_id: str, timer_id: str):
         timer.label = normalize_optional_text(data.get("label")) or timer.label
 
     db.session.commit()
+    _notify_device_schedule_change(user.nfc_tag_id, reason="timer_updated")
     return jsonify(timer.to_dict()), 200
 
 
@@ -820,6 +1043,7 @@ def cancel_timer(nfc_tag_id: str, timer_id: str):
 
     timer.active = False
     db.session.commit()
+    _notify_device_schedule_change(user.nfc_tag_id, reason="timer_cancelled")
     return jsonify({"message": "Timer cancelled"}), 200
 
 

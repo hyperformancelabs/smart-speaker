@@ -211,6 +211,12 @@ bool waitBeep(BeepRequest &request, TickType_t timeoutTicks) {
            xQueueReceive(gBeepQueue, &request, timeoutTicks) == pdPASS;
 }
 
+void resetBeepQueue() {
+    if (gBeepQueue != nullptr) {
+        xQueueReset(gBeepQueue);
+    }
+}
+
 void queueProfileLookup(const char *uid) {
     if (gProfileLookupRequestQueue == nullptr || uid == nullptr || uid[0] == '\0') {
         return;

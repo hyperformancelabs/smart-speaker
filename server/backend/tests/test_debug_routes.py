@@ -160,6 +160,50 @@ class DebugRouteTests(unittest.TestCase):
         self.assertEqual(capture_request.nfc_tag_id, "15:CF:D0:06")
         self.assertEqual(capture_request.device_id, "esp-1")
 
+    def test_device_announce_registers_latest_endpoint(self) -> None:
+        with patch.object(
+            backend_app_module.device_endpoint_store,
+            "register",
+        ) as register_mock:
+            response = self.client.post(
+                "/api/device/announce",
+                json={
+                    "ws_host": "192.168.1.15",
+                    "ws_port": 81,
+                    "device_id": "esp-1",
+                    "nfc_tag_id": "15:CF:D0:06",
+                },
+            )
+
+        self.assertEqual(response.status_code, 202)
+        register_mock.assert_called_once_with(
+            ws_host="192.168.1.15",
+            ws_port=81,
+            device_id="esp-1",
+            nfc_tag_id="15:CF:D0:06",
+        )
+
+    def test_device_schedule_notify_dispatches_sync_request(self) -> None:
+        with patch.object(
+            backend_app_module,
+            "notify_device_schedule_sync",
+            return_value={"status": "sent", "device_id": "esp-1"},
+        ) as notify_mock:
+            response = self.client.post(
+                "/api/device/schedules/notify",
+                json={
+                    "nfc_tag_id": "15:CF:D0:06",
+                    "reason": "timer_created",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["status"], "sent")
+        notify_mock.assert_called_once_with(
+            nfc_tag_id="15:CF:D0:06",
+            reason="timer_created",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

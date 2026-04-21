@@ -15,6 +15,7 @@
 #include "net/ws_service.h"
 #include "rtos/app_runtime.h"
 #include "secrets.h"
+#include "schedule/schedule_service.h"
 #include "sensors/rfid_service.h"
 #include "ui/oled_view.h"
 #include "ui/serial_telemetry.h"
@@ -166,6 +167,26 @@ UiMode uiModeForExternalAudioSessionState(ExternalAudioSessionState state) {
     return UiMode::WaitWakeword;
 }
 
+bool uiModeCanApplyExternalAudioSessionState(UiMode uiMode) {
+    switch (uiMode) {
+        case UiMode::WaitWakeword:
+        case UiMode::Streaming:
+        case UiMode::Thinking:
+        case UiMode::Speaking:
+            return true;
+        case UiMode::Splash:
+        case UiMode::WifiReconnect:
+        case UiMode::AwaitNfc:
+        case UiMode::Loading:
+        case UiMode::LookupError:
+        case UiMode::RegisterPrompt:
+        case UiMode::Greeting:
+            return false;
+    }
+
+    return false;
+}
+
 bool shouldPollRfid(UiMode uiMode, bool profileLookupPending) {
     if (profileLookupPending) {
         return false;
@@ -277,6 +298,11 @@ void audioCaptureTask(void *param) {
     AudioChunk chunk = {};
 
     for (;;) {
+        if (scheduleAlertActive()) {
+            vTaskDelay(pdMS_TO_TICKS(kUiSleepMs));
+            continue;
+        }
+
         if (!runtime::isMicrophoneCaptureActive()) {
             vTaskDelay(pdMS_TO_TICKS(kUiSleepMs));
             continue;
@@ -312,6 +338,17 @@ void wakewordTask(void *param) {
     bool wakewordActive = false;
 
     for (;;) {
+        if (scheduleAlertActive()) {
+            if (wakewordActive) {
+                wakewordActive = false;
+                wakeword = {};
+                runtime::storeWakewordState(wakeword);
+                runtime::resetWakewordAudioQueue();
+            }
+            vTaskDelay(pdMS_TO_TICKS(kUiSleepMs));
+            continue;
+        }
+
         if (!runtime::isWakewordDetectionActive()) {
             if (wakewordActive) {
                 wakewordActive = false;
@@ -351,6 +388,18 @@ void networkTask(void *param) {
     bool hasPlaybackRequest = false;
 
     for (;;) {
+        if (scheduleAlertActive()) {
+            if (streamingActive) {
+                streamingActive = false;
+                runtime::resetStreamAudioQueue();
+                audioResetWsFrames();
+            }
+            hasPlaybackRequest = false;
+            runtime::storePlaybackAudio(nullptr, 0);
+            vTaskDelay(pdMS_TO_TICKS(kNetworkSleepMs));
+            continue;
+        }
+
         wifiEnsureConnected();
         wsLoop();
 
@@ -447,12 +496,21 @@ void profileLookupTask(void *param) {
             continue;
         }
 
+        while (scheduleAlertActive()) {
+            vTaskDelay(pdMS_TO_TICKS(kUiSleepMs));
+        }
+
         wifiEnsureConnected();
+        scheduleAnnounceDevice(lookupRequest.uid);
 
         lookupResult = {};
         copyText(lookupResult.uid, sizeof(lookupResult.uid), lookupRequest.uid);
         lookupResult.requestOk = profileFetchStatus(lookupRequest.uid, lookupResult.status);
         runtime::publishProfileLookupResult(lookupResult);
+        if (lookupResult.requestOk && profileIsComplete(lookupResult.status)) {
+            // Keep login/UI responsive; the schedule task can sync in the background.
+            scheduleRequestSync(lookupRequest.uid, "nfc_login");
+        }
     }
 }
 
@@ -517,6 +575,27 @@ void uiTask(void *param) {
             setUiMode(uiMode, reconnectResumeMode, lastUiFrameMs);
         }
 
+        if (scheduleAlertActive()) {
+            if (rfidPoll(uid, sizeof(uid))) {
+                runtime::storeLastUid(uid);
+                scheduleDismissActiveAlert();
+                copyText(pendingLookupUid, sizeof(pendingLookupUid), uid);
+                profileLookupPending = true;
+                lastRegisterPromptLookupMs = now;
+                runtime::queueProfileLookup(uid);
+                loadingAnimationStartedMs = now;
+                setUiMode(uiMode, UiMode::Loading, lastUiFrameMs);
+            }
+
+            if (lastUiFrameMs == 0 || now - lastUiFrameMs >= kUiIntervalMs) {
+                oledDrawThinkingFace(now);
+                lastUiFrameMs = now;
+            }
+
+            vTaskDelay(pdMS_TO_TICKS(kUiSleepMs));
+            continue;
+        }
+
         if ((uiMode == UiMode::Thinking || uiMode == UiMode::Speaking) &&
             rfidPoll(uid, sizeof(uid))) {
             runtime::storeLastUid(uid);
@@ -575,10 +654,9 @@ void uiTask(void *param) {
             setUiMode(uiMode, UiMode::Streaming, lastUiFrameMs);
         }
 
+        const bool canApplyExternalState = uiModeCanApplyExternalAudioSessionState(uiMode);
         ExternalAudioSessionState nextExternalState = ExternalAudioSessionState::WaitWakeword;
-        if (runtime::consumeExternalAudioSessionState(nextExternalState) &&
-            (uiMode == UiMode::WaitWakeword || uiMode == UiMode::Streaming ||
-             uiMode == UiMode::Thinking || uiMode == UiMode::Speaking)) {
+        if (canApplyExternalState && runtime::consumeExternalAudioSessionState(nextExternalState)) {
             setUiMode(uiMode, uiModeForExternalAudioSessionState(nextExternalState), lastUiFrameMs);
         }
 
@@ -637,6 +715,12 @@ void beepTask(void *param) {
     runtime::BeepRequest request = {};
 
     for (;;) {
+        if (scheduleAlertActive()) {
+            runtime::resetBeepQueue();
+            vTaskDelay(pdMS_TO_TICKS(kUiSleepMs));
+            continue;
+        }
+
         if (!runtime::waitBeep(request, portMAX_DELAY)) {
             continue;
         }
@@ -682,6 +766,7 @@ void appTasksStart() {
     createTask(profileLookupTask, "profile_lookup", 8192, kProfileTaskPriority, kNetworkCore);
     createTask(uiTask, "ui", 6144, kUiTaskPriority, kNetworkCore);
     createTask(beepTask, "beep", 4096, kBeepTaskPriority, kNetworkCore);
+    scheduleInit();
 }
 
 void appRequestExternalAudioSessionState(ExternalAudioSessionState nextState) {

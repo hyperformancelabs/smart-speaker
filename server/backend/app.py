@@ -23,6 +23,8 @@ from config import (
     VOICE_BACKEND_PUBLIC_BASE_URL,
 )
 from dev_console import DEFAULT_BROWSER_DEVICE_ID, parse_json_object, run_browser_turn
+from device_endpoint_store import device_endpoint_store
+from device_schedule_dispatch import notify_device_schedule_sync
 from device_session_store import device_session_store
 from logging_utils import configure_logging, is_loopback_base_url, log_kv
 from tts_service import tts_service
@@ -500,8 +502,68 @@ def start_audio_capture():
         configured_public_base_url=VOICE_BACKEND_PUBLIC_BASE_URL,
         capture_token=capture_request.capture_token,
     )
+    device_endpoint_store.register(
+        ws_host=ws_host,
+        ws_port=capture_request.ws_port,
+        device_id=capture_request.device_id,
+        nfc_tag_id=capture_request.nfc_tag_id,
+    )
     status = capture_manager.start(capture_request)
     return jsonify({"status": "started", "capture": status, "public_base_url": public_base_url}), 202
+
+
+@app.route("/api/device/announce", methods=["POST"])
+def device_announce():
+    payload = request.get_json(silent=True) or {}
+    ws_host = str(payload.get("ws_host") or "").strip()
+    if not ws_host:
+        return jsonify({"error": "ws_host is required"}), 400
+
+    endpoint = device_endpoint_store.register(
+        ws_host=ws_host,
+        ws_port=int(payload.get("ws_port") or 81),
+        device_id=str(payload.get("device_id") or ws_host).strip() or ws_host,
+        nfc_tag_id=str(payload.get("nfc_tag_id") or "").strip() or None,
+    )
+    return (
+        jsonify(
+            {
+                "status": "announced",
+                "device_id": endpoint.device_id,
+                "ws_host": endpoint.ws_host,
+                "ws_port": endpoint.ws_port,
+                "nfc_tag_id": endpoint.nfc_tag_id,
+            }
+        ),
+        202,
+    )
+
+
+@app.route("/api/device/schedules/notify", methods=["POST"])
+def device_schedule_notify():
+    payload = request.get_json(silent=True) or {}
+    nfc_tag_id = str(payload.get("nfc_tag_id") or "").strip()
+    if not nfc_tag_id:
+        return jsonify({"error": "nfc_tag_id is required"}), 400
+
+    reason = str(payload.get("reason") or "schedule_changed").strip() or "schedule_changed"
+    try:
+        result = notify_device_schedule_sync(
+            nfc_tag_id=nfc_tag_id,
+            reason=reason,
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        logger.exception(
+            "device_schedule_notify_failed | nfc_tag_id=%r | reason=%r",
+            nfc_tag_id,
+            reason,
+        )
+        return jsonify({"error": f"Failed to notify device: {exc}"}), 502
+
+    status_code = 200 if result.get("status") == "sent" else 202
+    return jsonify(result), status_code
 
 
 @app.route("/api/audio/status", methods=["GET"])

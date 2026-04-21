@@ -13,6 +13,7 @@
 #include "net/wifi_service.h"
 #include "rtos/app_runtime.h"
 #include "rtos/app_tasks.h"
+#include "schedule/schedule_service.h"
 #include "secrets.h"
 
 #ifndef DEVICE_VOICE_BACKEND_URL
@@ -20,6 +21,9 @@
 #endif
 
 namespace {
+namespace runtime = app_runtime;
+using AudioSessionMode = runtime::AudioSessionMode;
+
 constexpr uint16_t kVoiceBackendConnectTimeoutMs = 2500;
 constexpr uint16_t kVoiceBackendRequestTimeoutMs = 6500;
 constexpr unsigned long kVoiceBackendWifiReadyWaitMs = 1500;
@@ -112,6 +116,40 @@ bool extractJsonStringField(const String &payload, const char *fieldName, String
 
     value = payload.substring(valueStart, valueEnd);
     return true;
+}
+
+bool extractJsonBoolField(const String &payload, const char *fieldName, bool &value) {
+    String key = "\"";
+    key += fieldName;
+    key += "\"";
+
+    const int keyIndex = payload.indexOf(key);
+    if (keyIndex < 0) {
+        return false;
+    }
+
+    const int colonIndex = payload.indexOf(':', keyIndex + key.length());
+    if (colonIndex < 0) {
+        return false;
+    }
+
+    int valueStart = colonIndex + 1;
+    while (valueStart < payload.length() &&
+           std::isspace(static_cast<unsigned char>(payload[valueStart]))) {
+        ++valueStart;
+    }
+
+    if (payload.startsWith("true", valueStart)) {
+        value = true;
+        return true;
+    }
+
+    if (payload.startsWith("false", valueStart)) {
+        value = false;
+        return true;
+    }
+
+    return false;
 }
 
 bool parseExternalAudioSessionState(const String &value, ExternalAudioSessionState &state) {
@@ -299,6 +337,27 @@ bool voiceBackendHandleControlMessage(const char *payload) {
         return false;
     }
 
+    if (messageType.equalsIgnoreCase("schedule_sync_request")) {
+        String nfcTagId;
+        String reason;
+        extractJsonStringField(message, "nfc_tag_id", nfcTagId);
+        extractJsonStringField(message, "reason", reason);
+
+        if (nfcTagId.isEmpty()) {
+            const AppState snapshot = app_runtime::loadAppStateSnapshot();
+            if (hasUsableNfcTagId(snapshot.lastUid)) {
+                nfcTagId = snapshot.lastUid;
+            }
+        }
+
+        if (!nfcTagId.isEmpty()) {
+            scheduleRequestSync(nfcTagId.c_str(), reason.c_str());
+            Serial.printf("voiceBackendHandleControlMessage: queued schedule sync for %s\n",
+                          nfcTagId.c_str());
+        }
+        return true;
+    }
+
     if (!messageMatchesActiveCaptureToken(message)) {
         String messageCaptureToken;
         extractJsonStringField(message, "capture_token", messageCaptureToken);
@@ -325,9 +384,21 @@ bool voiceBackendHandleControlMessage(const char *payload) {
             return true;
         }
 
+        bool stopCapture = false;
+        extractJsonBoolField(message, "stop_capture", stopCapture);
+
+        if (stopCapture && nextState == ExternalAudioSessionState::WaitWakeword) {
+            runtime::clearPendingExternalAudioSessionState();
+            runtime::resetStreamAudioQueue();
+            runtime::storePlaybackAudio(nullptr, 0);
+            voiceBackendInvalidateCaptureToken();
+            runtime::setAudioSessionMode(AudioSessionMode::WaitWakeword);
+        }
+
         appRequestExternalAudioSessionState(nextState);
-        Serial.printf("voiceBackendHandleControlMessage: queued state %s\n",
-                      appExternalAudioSessionStateName(nextState));
+        Serial.printf("voiceBackendHandleControlMessage: queued state %s stop_capture=%s\n",
+                      appExternalAudioSessionStateName(nextState),
+                      stopCapture ? "true" : "false");
         return true;
     }
 
