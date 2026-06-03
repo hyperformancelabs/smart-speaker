@@ -19,6 +19,12 @@ include/secrets.h
 *.venv/
 *.log
 
+# data inputs and generated outputs
+data/raw/
+data/temp/
+data/dataset/
+data/dataset_ready/
+
 *.wav
 *.mp3
 *.webm
