@@ -22,3 +22,4 @@ include/secrets.h
 *.wav
 *.mp3
 *.webm
+.serena/
