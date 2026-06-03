@@ -11,3 +11,21 @@ Thumbs.db
 # local config files
 include/secrets.h
 .local
+
+*.env
+
+*__pycache__/
+*.pyc
+*.venv/
+*.log
+
+# data inputs and generated outputs
+data/raw/
+data/temp/
+data/dataset/
+data/dataset_ready/
+
+*.wav
+*.mp3
+*.webm
+.serena/

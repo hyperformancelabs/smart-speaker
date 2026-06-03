@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Voice Backend Lab</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='assistant_lab.css') }}" />
+  </head>
+  <body>
+    <script>
+      window.ASSISTANT_LAB_BOOTSTRAP = {{ {
+        "publicBaseUrl": public_base_url,
+        "defaultUserId": default_user_id,
+        "defaultNfcTagId": default_nfc_tag_id,
+        "defaultDeviceId": default_device_id,
+        "defaultWsHost": default_ws_host,
+        "defaultWsPort": default_ws_port,
+        "defaultWsPath": default_ws_path,
+      } | tojson }};
+    </script>
+
+    <header class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Voice Backend Lab</p>
+        <h1>Test server độc lập trước khi cắm lại ESP</h1>
+        <p class="hero-text">
+          Trang này gọi thẳng vào `server/backend` để kiểm tra text turn, upload giọng nói từ browser,
+          playback TTS/media, session cache và trạng thái websocket capture.
+        </p>
+      </div>
+      <div class="hero-status">
+        <div class="status-card">
+          <span class="status-label">Health</span>
+          <strong id="healthBadge" class="badge badge-neutral">Chưa kiểm tra</strong>
+          <p id="healthMeta" class="status-meta">Backend chưa được ping.</p>
+          <button id="refreshHealthBtn" class="button button-secondary" type="button">Kiểm tra health</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="dashboard">
+      <section class="panel panel-session">
+        <div class="panel-header">
+          <h2>Session Lab</h2>
+          <p>Điều khiển identity và reset context như một thiết bị giả lập.</p>
+        </div>
+        <div class="field-grid">
+          <label class="field">
+            <span>User ID</span>
+            <input id="userIdInput" type="text" />
+          </label>
+          <label class="field">
+            <span>NFC Tag ID</span>
+            <input id="nfcTagInput" type="text" />
+          </label>
+          <label class="field">
+            <span>Device ID</span>
+            <input id="deviceIdInput" type="text" />
+          </label>
+        </div>
+        <div class="inline-actions">
+          <button id="resetSessionBtn" class="button button-warning" type="button">Reset session</button>
+          <button id="refreshSessionsBtn" class="button button-secondary" type="button">Xem active sessions</button>
+          <button id="smokeTestBtn" class="button button-primary" type="button">Run smoke test</button>
+        </div>
+        <div class="toggle-row">
+          <label class="checkbox">
+            <input id="autoplayCheckbox" type="checkbox" checked />
+            <span>Tự động phát TTS sau mỗi turn</span>
+          </label>
+        </div>
+        <div class="meta-box">
+          <div>
+            <span class="meta-label">Session key</span>
+            <strong id="sessionKeyValue">-</strong>
+          </div>
+          <div>
+            <span class="meta-label">Pending question</span>
+            <strong id="pendingValue">-</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel panel-turn">
+        <div class="panel-header">
+          <h2>Text Turn</h2>
+          <p>Gọi backend text flow để xác nhận orchestration, tool call và session state.</p>
+        </div>
+        <label class="field">
+          <span>Nội dung gửi lên server</span>
+          <textarea id="textInput" rows="5" placeholder="Ví dụ: phát cho mình lo-fi trên YouTube"></textarea>
+        </label>
+        <div class="inline-actions">
+          <button id="sendTextBtn" class="button button-primary" type="button">Gửi text turn</button>
+          <button id="clearComposerBtn" class="button button-ghost" type="button">Xóa ô nhập</button>
+        </div>
+      </section>
+
+      <section class="panel panel-voice">
+        <div class="panel-header">
+          <h2>Voice Turn</h2>
+          <p>Dùng chính browser mic hoặc upload file audio để kiểm tra STT server và full turn.</p>
+        </div>
+        <div class="inline-actions wrap">
+          <button id="recordBtn" class="button button-primary" type="button">Bắt đầu ghi âm</button>
+          <label class="upload-chip">
+            <input id="audioFileInput" type="file" accept="audio/*,.wav,.webm,.mp3,.m4a,.ogg" />
+            <span>Chọn file audio</span>
+          </label>
+          <button id="sendFileBtn" class="button button-secondary" type="button">Upload file</button>
+        </div>
+        <p id="recordingHint" class="panel-hint">
+          Browser sẽ thu `audio/webm` nếu hỗ trợ. Khi dừng ghi, file sẽ được gửi lên `POST /api/dev/assistant-turn`.
+        </p>
+        <div id="selectedFileMeta" class="file-meta">Chưa chọn file.</div>
+      </section>
+
+      <section class="panel panel-playback">
+        <div class="panel-header">
+          <h2>Playback</h2>
+          <p>Nghe đúng asset mà server vừa sinh ra để kiểm tra TTS và media transcoding.</p>
+        </div>
+        <div id="playbackSummary" class="playback-summary">Chưa có playback cho turn nào.</div>
+        <div id="playbackQueue" class="playback-queue"></div>
+        <div class="inline-actions">
+          <button id="playSequenceBtn" class="button button-secondary" type="button">Phát lại full sequence</button>
+        </div>
+      </section>
+
+      <section class="panel panel-esp">
+        <div class="panel-header">
+          <h2>ESP Capture Controls</h2>
+          <p>Khi cần chuyển sang test với ESP, cùng một trang này có thể gọi `/api/audio/*` để đối chiếu.</p>
+        </div>
+        <div class="field-grid">
+          <label class="field">
+            <span>WS Host</span>
+            <input id="wsHostInput" type="text" placeholder="192.168.1.25" />
+          </label>
+          <label class="field">
+            <span>WS Port</span>
+            <input id="wsPortInput" type="number" min="1" value="81" />
+          </label>
+          <label class="field">
+            <span>WS Path</span>
+            <input id="wsPathInput" type="text" value="/" />
+          </label>
+          <label class="field">
+            <span>First utterance state</span>
+            <select id="firstUtteranceStateSelect">
+              <option value="thinking">thinking</option>
+              <option value="speaking">speaking</option>
+              <option value="wait_wakeword">wait_wakeword</option>
+              <option value="streaming">streaming</option>
+            </select>
+          </label>
+        </div>
+        <div class="inline-actions wrap">
+          <button id="startCaptureBtn" class="button button-primary" type="button">Start capture</button>
+          <button id="refreshCaptureBtn" class="button button-secondary" type="button">Refresh capture status</button>
+          <button id="stopCaptureBtn" class="button button-warning" type="button">Stop capture</button>
+        </div>
+      </section>
+
+      <section class="panel panel-log">
+        <div class="panel-header">
+          <h2>Conversation Log</h2>
+          <p>Lịch sử turn gần nhất trên client side để nhìn flow giống CLI.</p>
+        </div>
+        <div id="conversationLog" class="conversation-log"></div>
+      </section>
+
+      <section class="panel panel-json">
+        <div class="panel-header">
+          <h2>Diagnostics</h2>
+          <p>Xem thẳng raw JSON trả về từ server, active sessions và audio capture status.</p>
+        </div>
+        <div class="json-grid">
+          <article class="json-card">
+            <h3>Last response</h3>
+            <pre id="responseJson">{}</pre>
+          </article>
+          <article class="json-card">
+            <h3>Active sessions</h3>
+            <pre id="sessionsJson">{}</pre>
+          </article>
+          <article class="json-card">
+            <h3>Capture status</h3>
+            <pre id="captureJson">{}</pre>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" aria-live="polite"></div>
+    <script src="{{ url_for('static', filename='assistant_lab.js') }}" defer></script>
+  </body>
+</html>

@@ -18,31 +18,39 @@ Hardware configuration for ESP32 with OLED, INMP441, RC522, and MAX98357A module
 * All modules must share common GND with ESP32
 * Use star topology for GND connections to reduce noise
 
+**Wire Color Convention (recommended):**
+
+| Signal | Color         |
+| ------ | ------------- |
+| 5V     | Red           |
+| 3.3V   | Orange        |
+| GND    | Black / Brown |
+
 ---
 
 ## Module Connections
 
 ### 1. OLED SSD1306 (I2C)
 
-| OLED Pin  | ESP32 Pin    | Notes         |
-| --------- | ------------ | ------------- |
-| VDD / VCC | 3V3          | Do not use 5V |
-| GND       | GND          |               |
-| SCK / SCL | D22 (GPIO22) | I2C Clock     |
-| SDA       | D21 (GPIO21) | I2C Data      |
+| OLED Pin  | ESP32 Pin    | Wire Color (rcm) | Notes         |
+| --------- | ------------ | ---------------- | ------------- |
+| VDD / VCC | 3V3          | Orange           | Do not use 5V |
+| GND       | GND          | Black            |               |
+| SCK / SCL | D22 (GPIO22) | White            | I2C Clock     |
+| SDA       | D21 (GPIO21) | Blue             | I2C Data      |
 
 ---
 
 ### 2. INMP441 Microphone (I2S RX)
 
-| INMP441 Pin | ESP32 Pin    | Notes                         |
-| ----------- | ------------ | ----------------------------- |
-| VDD         | 3V3          |                               |
-| GND         | GND          |                               |
-| SCK (BCLK)  | D26 (GPIO26) | I2S Clock (Shared with AMP)   |
-| WS (LRCLK)  | D27 (GPIO27) | Word Select (Shared with AMP) |
-| SD (DATA)   | D32 (GPIO32) | Data from mic                 |
-| L/R         | GND          | Selects RIGHT channel         |
+| INMP441 Pin | ESP32 Pin    | Wire Color (rcm) | Notes                         |
+| ----------- | ------------ | ---------------- | ----------------------------- |
+| VDD         | 3V3          | Orange           |                               |
+| GND         | GND          | Black            |                               |
+| SCK (BCLK)  | D26 (GPIO26) | Purple           | I2S Clock (Shared with AMP)   |
+| WS (LRCLK)  | D27 (GPIO27) | Yellow           | Word Select (Shared with AMP) |
+| SD (DATA)   | D32 (GPIO32) | Blue             | Data from mic                 |
+| L/R         | GND          | Brown            | Selects RIGHT channel         |
 
 **Note:** Use RIGHT channel in code. Keep I2S wires short and separate from SPI.
 
@@ -50,16 +58,16 @@ Hardware configuration for ESP32 with OLED, INMP441, RC522, and MAX98357A module
 
 ### 3. RC522 RFID (SPI)
 
-| RC522 Pin | ESP32 Pin    | Notes                |
-| --------- | ------------ | -------------------- |
-| 3.3V      | 3V3          | **Do not use 5V**    |
-| GND       | GND          |                      |
-| RST       | D17 / GPIO17 | Labeled TX2 on board |
-| SDA / SS  | D16 / GPIO16 | Labeled RX2 on board |
-| SCK       | D18 (GPIO18) |                      |
-| MISO      | D19 (GPIO19) |                      |
-| MOSI      | D23 (GPIO23) |                      |
-| IRQ       | NC           | Not connected        |
+| RC522 Pin | ESP32 Pin    | Wire Color (rcm) | Notes                |
+| --------- | ------------ | ---------------- | -------------------- |
+| 3.3V      | 3V3          | Orange           | **Do not use 5V**    |
+| GND       | GND          | Black            |                      |
+| RST       | D17 / GPIO17 | Brown            | Labeled TX2 on board |
+| SDA / SS  | D16 / GPIO16 | White            | Labeled RX2 on board |
+| SCK       | D18 (GPIO18) | Yellow           |                      |
+| MISO      | D19 (GPIO19) | Purple           |                      |
+| MOSI      | D23 (GPIO23) | Green            |                      |
+| IRQ       | NC           | -                | Not connected        |
 
 **Noise reduction:** Add 0.1µF + 10µF capacitors between 3.3V and GND at RC522.
 
@@ -67,15 +75,15 @@ Hardware configuration for ESP32 with OLED, INMP441, RC522, and MAX98357A module
 
 ### 4. MAX98357A Amplifier (I2S TX)
 
-| MAX98357A Pin | ESP32 Pin    | Notes                                  |
-| ------------- | ------------ | -------------------------------------- |
-| VIN           | VIN (5V)     | Amp power                              |
-| GND           | GND          |                                        |
-| DIN           | D25 (GPIO25) | I2S Data                               |
-| BCLK          | D26 (GPIO26) | I2S Clock                              |
-| LRC / LRCLK   | D27 (GPIO27) | Word Select                            |
-| SD            | D13 (GPIO13) | Enable/shutdown (GPIO controlled)      |
-| GAIN          | NC           | Default gain; connect to GND to reduce |
+| MAX98357A Pin | ESP32 Pin    | Wire Color (rcm) | Notes                                  |
+| ------------- | ------------ | ---------------- | -------------------------------------- |
+| VIN           | VIN (5V)     | Red              | Amp power                              |
+| GND           | GND          | Black            |                                        |
+| DIN           | D25 (GPIO25) | Gray             | I2S Data                               |
+| BCLK          | D26 (GPIO26) | Purple           | I2S Clock                              |
+| LRC / LRCLK   | D27 (GPIO27) | Yellow           | Word Select                            |
+| SD            | D13 (GPIO13) | Brown            | Enable/shutdown (GPIO controlled)      |
+| GAIN          | NC           | -                | Default gain; connect to GND to reduce |
 
 **Speaker:**
 
