@@ -7,6 +7,7 @@ from typing import Any
 from assistant_core.runtime import run_pipeline
 from asset_registry import asset_registry
 from database_api import get_user_by_nfc_tag
+from config import DISABLE_TTS
 from device_session_store import device_session_store
 from logging_utils import log_kv
 from session_control import AudioSessionDirective, DeviceAudioSessionState, build_audio_session_state_message
@@ -245,28 +246,6 @@ def run_assistant_turn(payload: dict[str, Any]) -> dict[str, Any]:
         text_input=text_input,
     )
 
-    if "session_state" not in request_payload or not isinstance(request_payload.get("session_state"), dict):
-        cached_session_state = _load_cached_session_state(
-            nfc_tag_id=nfc_tag_id,
-            user_id=user_id,
-            device_id=device_id,
-        )
-        if cached_session_state:
-            request_payload["session_state"] = cached_session_state
-
-    if not nfc_tag_id:
-        recovered_nfc_tag_id = _recover_nfc_tag_id_from_session_state(request_payload.get("session_state"))
-        if recovered_nfc_tag_id:
-            nfc_tag_id = recovered_nfc_tag_id
-            request_payload["nfc_tag_id"] = nfc_tag_id
-            log_kv(
-                logger,
-                logging.INFO,
-                "assistant_nfc_restored_from_session_cache",
-                device_id=device_id,
-                nfc_tag_id=nfc_tag_id,
-            )
-
     if nfc_tag_id:
         user_profile = get_user_by_nfc_tag(nfc_tag_id)
         if user_profile and user_profile.get("user_id"):
@@ -283,19 +262,10 @@ def run_assistant_turn(payload: dict[str, Any]) -> dict[str, Any]:
     request_payload["text_input"] = text_input
     final_output = run_pipeline(request_payload)
 
-    session_state = final_output.get("session_state")
-    if isinstance(session_state, dict):
-        _store_session_state_aliases(
-            session_state=session_state,
-            nfc_tag_id=nfc_tag_id,
-            user_id=user_id,
-            device_id=device_id,
-        )
-
     playback: dict[str, Any] | None = None
     playback_error: str | None = None
     tts_text = str(final_output.get("tts_text") or "").strip()
-    if tts_text:
+    if tts_text and not DISABLE_TTS:
         try:
             speech = tts_service.synthesize(tts_text)
             speech_record = asset_registry.register_tts_file(
@@ -332,6 +302,8 @@ def run_assistant_turn(payload: dict[str, Any]) -> dict[str, Any]:
         except Exception as exc:
             playback_error = str(exc)
             logger.exception("assistant_tts_failed")
+    elif tts_text and DISABLE_TTS:
+        playback_error = "TTS disabled by configuration"
 
     actionable_commands: list[dict[str, Any]] = []
     media_playback: dict[str, Any] | None = None

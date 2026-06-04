@@ -99,3 +99,6 @@ LOG_FILE = os.getenv("LOG_FILE", "llm_pipeline.log")
 LOG_FILE_PATH = Path(LOG_FILE).expanduser()
 if not LOG_FILE_PATH.is_absolute():
     LOG_FILE_PATH = (BASE_DIR / LOG_FILE_PATH).resolve()
+
+# Runtime feature flags
+DISABLE_TTS = os.getenv("DISABLE_TTS", "false").strip().lower() in {"true", "1", "yes"}
