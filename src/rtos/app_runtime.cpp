@@ -243,6 +243,15 @@ bool tryPopProfileLookupResult(ProfileLookupResult &result) {
            xQueueReceive(gProfileLookupResultQueue, &result, 0) == pdPASS;
 }
 
+void resetProfileLookupQueues() {
+    if (gProfileLookupRequestQueue != nullptr) {
+        xQueueReset(gProfileLookupRequestQueue);
+    }
+    if (gProfileLookupResultQueue != nullptr) {
+        xQueueReset(gProfileLookupResultQueue);
+    }
+}
+
 void queueAssistantPlayback(const AssistantPlaybackRequest &request) {
     if (gPlaybackQueue != nullptr) {
         xQueueOverwrite(gPlaybackQueue, &request);
@@ -251,6 +260,12 @@ void queueAssistantPlayback(const AssistantPlaybackRequest &request) {
 
 bool tryPopAssistantPlayback(AssistantPlaybackRequest &request) {
     return gPlaybackQueue != nullptr && xQueueReceive(gPlaybackQueue, &request, 0) == pdPASS;
+}
+
+void resetAssistantPlaybackQueue() {
+    if (gPlaybackQueue != nullptr) {
+        xQueueReset(gPlaybackQueue);
+    }
 }
 
 void setAudioSessionMode(AudioSessionMode nextMode) {

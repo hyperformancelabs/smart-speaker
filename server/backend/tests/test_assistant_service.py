@@ -74,6 +74,7 @@ class AssistantServiceTests(unittest.TestCase):
         self.assertNotIn("session_state", captured_payload)
         self.assertEqual(captured_payload["user_id"], "resolved-user")
         self.assertEqual(result["playback"]["tts"]["url"], "http://localhost/tts_123.wav")
+        self.assertEqual(result["esp_messages"][1]["final_state"], "streaming")
 
     def test_run_assistant_turn_replaces_placeholder_user_id_from_nfc_profile(self) -> None:
         captured_payload: dict[str, object] = {}

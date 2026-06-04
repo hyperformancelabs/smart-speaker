@@ -35,6 +35,7 @@ namespace runtime = app_runtime;
 constexpr uint16_t kScheduleConnectTimeoutMs = 2500;
 constexpr uint16_t kScheduleRequestTimeoutMs = 6500;
 constexpr unsigned long kScheduleWifiReadyWaitMs = 1500;
+constexpr unsigned long kScheduleWakewordSyncPollMs = 50;
 constexpr char kScheduleSyncPathPrefix[] = "/api/device/users/";
 constexpr char kScheduleSyncPathSuffix[] = "/schedule-sync";
 constexpr char kScheduleEventPathSuffix[] = "/schedule-events";
@@ -394,6 +395,11 @@ bool performHttpPostJson(const String &url, const String &payload, int &httpCode
     return true;
 }
 
+bool shouldDeferScheduleSyncForWakeword() {
+    return (!runtime::isAudioSessionActive() || runtime::isWakewordDetectionActive()) &&
+           !loadAlertActive();
+}
+
 bool reportConsumedSchedules(const ScheduleEntry entries[], size_t count) {
     if (entries == nullptr || count == 0) {
         return true;
@@ -513,12 +519,28 @@ void scheduleTask(void *param) {
     (void)param;
 
     ScheduleEvent event = {};
+    ScheduleEvent deferredSync = {};
+    bool hasDeferredSync = false;
     for (;;) {
-        if (!xQueueReceive(gScheduleEventQueue, &event, portMAX_DELAY)) {
+        if (hasDeferredSync && !shouldDeferScheduleSyncForWakeword()) {
+            scheduleSyncForUid(deferredSync.uid, deferredSync.reason);
+            hasDeferredSync = false;
+            deferredSync = {};
+            continue;
+        }
+
+        const TickType_t waitTicks =
+            hasDeferredSync ? pdMS_TO_TICKS(kScheduleWakewordSyncPollMs) : portMAX_DELAY;
+        if (!xQueueReceive(gScheduleEventQueue, &event, waitTicks)) {
             continue;
         }
 
         if (event.type == ScheduleEventType::SyncRequest) {
+            if (shouldDeferScheduleSyncForWakeword()) {
+                deferredSync = event;
+                hasDeferredSync = true;
+                continue;
+            }
             scheduleSyncForUid(event.uid, event.reason);
             continue;
         }

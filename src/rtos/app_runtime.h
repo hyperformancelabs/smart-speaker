@@ -56,9 +56,11 @@ void queueProfileLookup(const char *uid);
 bool waitProfileLookup(ProfileLookupRequest &request, TickType_t timeoutTicks);
 void publishProfileLookupResult(const ProfileLookupResult &result);
 bool tryPopProfileLookupResult(ProfileLookupResult &result);
+void resetProfileLookupQueues();
 
 void queueAssistantPlayback(const AssistantPlaybackRequest &request);
 bool tryPopAssistantPlayback(AssistantPlaybackRequest &request);
+void resetAssistantPlaybackQueue();
 
 void setAudioSessionMode(AudioSessionMode nextMode);
 AudioSessionMode audioSessionMode();
