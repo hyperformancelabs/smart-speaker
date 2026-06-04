@@ -252,6 +252,10 @@ void setUiMode(UiMode &uiMode, UiMode nextMode, unsigned long &lastUiFrameMs) {
     lastUiFrameMs = 0;
 }
 
+void transitionToWakeword(UiMode &uiMode, unsigned long &lastUiFrameMs) {
+    setUiMode(uiMode, UiMode::WaitWakeword, lastUiFrameMs);
+}
+
 bool handleStartupUi(unsigned long splashStartedMs,
                      unsigned long &lastStartupFrameMs,
                      bool &wifiReadyBeeped,
@@ -603,7 +607,7 @@ void uiTask(void *param) {
             Serial.printf("active-mode: interrupted by nfc %s\n", uid);
             runtime::clearPendingExternalAudioSessionState();
             voiceBackendInvalidateCaptureToken();
-            setUiMode(uiMode, UiMode::Streaming, lastUiFrameMs);
+            transitionToWakeword(uiMode, lastUiFrameMs);
             continue;
         }
 
@@ -647,7 +651,7 @@ void uiTask(void *param) {
         if (uiMode == UiMode::Greeting &&
             greetingStartedMs > 0 &&
             now - greetingStartedMs >= kGreetingDurationMs) {
-            setUiMode(uiMode, UiMode::WaitWakeword, lastUiFrameMs);
+            transitionToWakeword(uiMode, lastUiFrameMs);
         }
 
         if (uiMode == UiMode::WaitWakeword && runtime::consumeWakewordTransition()) {
@@ -657,7 +661,11 @@ void uiTask(void *param) {
         const bool canApplyExternalState = uiModeCanApplyExternalAudioSessionState(uiMode);
         ExternalAudioSessionState nextExternalState = ExternalAudioSessionState::WaitWakeword;
         if (canApplyExternalState && runtime::consumeExternalAudioSessionState(nextExternalState)) {
-            setUiMode(uiMode, uiModeForExternalAudioSessionState(nextExternalState), lastUiFrameMs);
+            if (nextExternalState == ExternalAudioSessionState::WaitWakeword) {
+                transitionToWakeword(uiMode, lastUiFrameMs);
+            } else {
+                setUiMode(uiMode, uiModeForExternalAudioSessionState(nextExternalState), lastUiFrameMs);
+            }
         }
 
         if (lastUiFrameMs == 0 || now - lastUiFrameMs >= kUiIntervalMs) {
