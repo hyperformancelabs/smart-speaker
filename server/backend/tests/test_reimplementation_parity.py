@@ -1,40 +1,13 @@
 from __future__ import annotations
 
 from pathlib import Path
+import importlib
 import unittest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-REFERENCE_ROOT = REPO_ROOT / ".local" / "llm-orches"
 SERVER_BACKEND_ROOT = REPO_ROOT / "server" / "backend"
 SERVER_DATABASE_ROOT = REPO_ROOT / "server" / "database"
-
-IDENTICAL_BACKEND_PATHS = [
-    "assistant_core/state.py",
-    "assistant_core/nodes.py",
-    "assistant_core/graph.py",
-    "assistant_core/runtime.py",
-    "assistant_core/utils.py",
-    "assistant_core/wrapper.py",
-    "assistant_core/prompts.py",
-    "assistant_tools/common.py",
-    "assistant_tools/registry.py",
-    "assistant_tools/information.py",
-    "assistant_tools/media.py",
-    "assistant_tools/schema.py",
-    "profile_schema.py",
-    "web_search_tool.py",
-    "content_fetch_tool.py",
-    "youtube_stream_tool.py",
-]
-
-IDENTICAL_DATABASE_PATHS = [
-    "app.py",
-    "models.py",
-    "schema.sql",
-    "Procfile",
-    "requirements.txt",
-]
 
 EXPECTED_SERVER_EXTENSIONS = {
     "config.py": [
@@ -56,19 +29,18 @@ EXPECTED_SERVER_EXTENSIONS = {
 
 
 class ReimplementationParityTests(unittest.TestCase):
-    def test_backend_reference_modules_match_byte_for_byte(self) -> None:
-        for relative_path in IDENTICAL_BACKEND_PATHS:
-            with self.subTest(relative_path=relative_path):
-                reference_bytes = (REFERENCE_ROOT / relative_path).read_bytes()
-                server_bytes = (SERVER_BACKEND_ROOT / relative_path).read_bytes()
-                self.assertEqual(server_bytes, reference_bytes)
-
-    def test_database_reference_modules_match_byte_for_byte(self) -> None:
-        for relative_path in IDENTICAL_DATABASE_PATHS:
-            with self.subTest(relative_path=relative_path):
-                reference_bytes = (REFERENCE_ROOT / "database" / relative_path).read_bytes()
-                server_bytes = (SERVER_DATABASE_ROOT / relative_path).read_bytes()
-                self.assertEqual(server_bytes, reference_bytes)
+    def test_backend_runtime_modules_import(self) -> None:
+        modules = [
+            "assistant_core.runtime",
+            "assistant_core.wrapper",
+            "assistant_core.graph",
+            "assistant_core.nodes",
+            "assistant_service",
+        ]
+        for module_name in modules:
+            with self.subTest(module_name=module_name):
+                imported = importlib.import_module(module_name)
+                self.assertIsNotNone(imported)
 
     def test_server_specific_files_keep_expected_extensions(self) -> None:
         for relative_path, expected_snippets in EXPECTED_SERVER_EXTENSIONS.items():

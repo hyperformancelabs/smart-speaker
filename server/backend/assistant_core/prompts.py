@@ -33,7 +33,15 @@ TASK_GROUPS = {
     },
     "personalization": {
         "description": "Personal Data Management: đọc hoặc cập nhật hồ sơ, sở thích, memory của user.",
-        "tools": ["get_user_profile", "update_user_profile", "save_memory", "delete_memory", "get_memory"],
+        "tools": [
+            "get_user_profile",
+            "update_user_profile",
+            "save_memory",
+            "delete_memory",
+            "get_memory",
+            "reset_memory",
+            "reset_preferences",
+        ],
         "examples": ["tôi thích jazz", "bạn nhớ gì về tôi", "đổi tên của tôi thành Phát"],
     },
     "conversation": {
@@ -73,6 +81,7 @@ Quy tắc:
 - Conversation khi không thuộc 4 nhóm trên, hoặc user muốn tiếp tục trò chuyện mở.
 - Nếu đang ở conversation mode và user phát sinh yêu cầu thuộc 4 nhóm đầu, route sang group thật của yêu cầu đó như một subtask tạm thời.
 - Nếu user nói rõ muốn kết thúc cuộc trò chuyện, quên context hội thoại, reset context, `forget everything`, hoặc bắt đầu chat mới, route về conversation để conversation agent xử lý control command đó.
+- Nếu user nói "quên memory", "reset memory", "quên preferences", "reset preferences", hoặc xóa bộ nhớ/cài đặt cá nhân, route về personalization để xử lý tool reset tương ứng, không route conversation.
 - Nếu user đang trả lời cho một câu hỏi clarify/confirm gần nhất, ưu tiên route vào đúng group đang chờ.
 
 Trả về đúng một JSON hợp lệ.
@@ -471,6 +480,8 @@ Quy tắc:
   - "tôi thích chó" => likes += ["chó"]
 - Nếu cần trả lời bằng text trong agent này, hãy tuân thủ response behavior preferences đã được truyền trong prompt user.
 - Khi update `preferences`, hãy gửi `update_user_profile(field="preferences", value=<partial_or_merged_json_object>)`.
+- Khi user yêu cầu "quên hết memory", "reset memory", "đưa memory về mặc định", hãy gọi `reset_memory`.
+- Khi user yêu cầu "reset preferences", "đưa preferences về mặc định", hãy gọi `reset_preferences`.
 - Nếu vừa hoàn thành một thao tác write thành công, câu trả lời nên là câu xác nhận hoàn tất ngắn gọn; không thêm câu hỏi xã giao kiểu "có gì mình giúp thêm không?" trong JSON này.
 - Với yêu cầu đọc thông tin đã lưu như "kiểm tra thông tin cá nhân của tôi", "bạn biết gì về tôi", "kiểm tra tên", "kiểm tra sở thích", "đọc tất cả thông tin của tôi", phải dùng `get_user_profile` hoặc `get_memory` ngay; không hỏi xác nhận trước.
 - Nếu pending clarification trước đó đang hỏi user muốn đọc phần nào và user trả lời ngắn như "tất cả", "tên", "sở thích", "tên và sở thích", hãy hiểu đây là bổ sung đủ thông tin cho một yêu cầu read và chuyển sang `use_tools`.
@@ -533,6 +544,7 @@ Mục tiêu:
 - Nếu user muốn kể chuyện, gợi ý, tâm sự, lên kế hoạch hoặc chat bình thường thì tiếp tục cuộc trò chuyện.
 - Không tự kết thúc conversation trừ khi user nói rõ là muốn dừng.
 - Nếu user yêu cầu reset context kiểu `/forget`, `new chat`, `forget everything`, hãy hiểu đó là lệnh điều khiển session chat; xóa shell conversation hiện tại nhưng không tự xóa personal memory/preferences trừ khi user nói rõ.
+- Nếu user yêu cầu quên memory, reset memory, quên preferences, reset preferences, hoặc xóa dữ liệu cá nhân, hãy route vào personalization để xử lý tool reset tương ứng, không xem là lệnh chat control chung.
 - Trong lúc chat, có thể đã có subtask khác vừa chạy xong; sau các subtask đó, conversation vẫn còn mở nếu user chưa nói kết thúc.
 - Assistant_text PHẢI tuân thủ response behavior preferences được truyền trong prompt user, đặc biệt là output language, assistant_style và response_verbosity.
 - Nếu preferred language là English thì mặc định trả lời bằng English, trừ khi user ở turn hiện tại yêu cầu dùng ngôn ngữ khác.

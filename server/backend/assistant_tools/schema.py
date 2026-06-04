@@ -307,6 +307,16 @@ TOOLS_DEFINITIONS = [
         "description": "Lấy toàn bộ memory cá nhân của user.",
         "input_schema": {"type": "object", "properties": {}},
     },
+    {
+        "name": "reset_memory",
+        "description": "Đưa memory cá nhân về mặc định rỗng.",
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "reset_preferences",
+        "description": "Đưa preferences cá nhân về mặc định của hệ thống.",
+        "input_schema": {"type": "object", "properties": {}},
+    },
 ]
 
 

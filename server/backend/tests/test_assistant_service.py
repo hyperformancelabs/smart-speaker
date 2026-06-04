@@ -15,7 +15,7 @@ import assistant_service
 
 
 class AssistantServiceTests(unittest.TestCase):
-    def test_run_assistant_turn_uses_cached_session_when_request_omits_one(self) -> None:
+    def test_run_assistant_turn_does_not_inject_cached_session_state(self) -> None:
         captured_payload: dict[str, object] = {}
 
         def fake_run_pipeline(payload: dict[str, object]) -> dict[str, object]:
@@ -71,7 +71,7 @@ class AssistantServiceTests(unittest.TestCase):
                 }
             )
 
-        self.assertEqual(captured_payload["session_state"], {"mode": "router"})
+        self.assertNotIn("session_state", captured_payload)
         self.assertEqual(captured_payload["user_id"], "resolved-user")
         self.assertEqual(result["playback"]["tts"]["url"], "http://localhost/tts_123.wav")
 
@@ -133,7 +133,7 @@ class AssistantServiceTests(unittest.TestCase):
 
         self.assertEqual(captured_payload["user_id"], "resolved-user-uuid")
 
-    def test_run_assistant_turn_recovers_nfc_tag_id_from_device_session_cache(self) -> None:
+    def test_run_assistant_turn_keeps_provided_nfc_tag_id(self) -> None:
         captured_payload: dict[str, object] = {}
 
         def fake_run_pipeline(payload: dict[str, object]) -> dict[str, object]:
@@ -156,16 +156,7 @@ class AssistantServiceTests(unittest.TestCase):
             channels=1,
         )
 
-        cached_session_state = {
-            "mode": "conversation",
-            "profile_cache": {
-                "nfc_tag_id": "15:CF:D0:06",
-                "name": "Phat",
-                "memory": ["thích nhạc lofi"],
-            },
-        }
-
-        with patch.object(assistant_service.device_session_store, "get", return_value=cached_session_state), patch.object(
+        with patch.object(assistant_service.device_session_store, "get", return_value=None), patch.object(
             assistant_service.device_session_store,
             "set",
         ), patch.object(
@@ -192,12 +183,29 @@ class AssistantServiceTests(unittest.TestCase):
             assistant_service.run_assistant_turn(
                 {
                     "device_id": "esp-1",
+                    "nfc_tag_id": "15:CF:D0:06",
                     "text_input": "bạn nhớ gì về tôi",
                 }
             )
 
         self.assertEqual(captured_payload["nfc_tag_id"], "15:CF:D0:06")
         self.assertEqual(captured_payload["user_id"], "resolved-from-cache")
+
+    def test_reset_tools_return_default_state(self) -> None:
+        from assistant_tools.registry import execute_tool
+
+        with patch("assistant_tools.backend_tools.backend_json") as backend_json_mock:
+            backend_json_mock.side_effect = [
+                {"memory": []},
+                {"preferences": {"language": "vi-VN"}},
+            ]
+            memory_result = execute_tool("reset_memory", {}, nfc_tag_id="nfc-1")
+            preferences_result = execute_tool("reset_preferences", {}, nfc_tag_id="nfc-1")
+
+        self.assertEqual(memory_result["status"], "success")
+        self.assertEqual(preferences_result["status"], "success")
+        self.assertIn("default", memory_result["message"].lower())
+        self.assertIn("default", preferences_result["message"].lower())
 
     def test_run_assistant_turn_enriches_media_commands_for_device(self) -> None:
         media_record = SimpleNamespace(
