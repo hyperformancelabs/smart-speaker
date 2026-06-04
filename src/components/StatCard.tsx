@@ -14,7 +14,7 @@ export function StatCard({ icon, value, label, iconColor, onPress }: StatCardPro
   return (
     <Pressable 
       onPress={onPress}
-      className={`flex-1 min-w-[140px] flex-row items-center gap-4 border border-[#e0d8d0] bg-[#fcf9f3] p-4 rounded-xl ${onPress ? 'active:opacity-70' : ''}`}
+      className={`flex-1 min-w-[140px] flex-row items-center gap-4 border border-[#e0d8d0]/60 bg-[#fcf9f3]/95 p-4 rounded-xl shadow-sm ${onPress ? 'active:opacity-70' : ''}`}
     >
       <View className="items-center justify-center h-12 w-12 rounded-full" style={{ backgroundColor: `${iconColor}15` }}>
         <Ionicons name={icon} size={24} color={iconColor} />

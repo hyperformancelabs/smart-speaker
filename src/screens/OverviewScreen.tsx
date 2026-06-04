@@ -1,7 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Image,
+  ImageBackground,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatCard } from '../components/StatCard';
 import { useAuth } from '../contexts/AuthContext';
@@ -107,176 +116,192 @@ export function OverviewScreen({ navigation }: any) {
     return (
       <SafeAreaView
         edges={['top']}
-        className="flex-1 items-center justify-center bg-[#f4efe6] font-sans">
+        className="flex-1 items-center justify-center bg-[#fcf9f3]/95 font-sans">
         <ActivityIndicator size="large" color="#145374" />
-        <Text className="mt-3 text-[#5b6773]">Đang tải dữ liệu tổng quan...</Text>
+        <Text className="mt-3 font-bold text-[#5b6773]">Đang tải dữ liệu tổng quan...</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView edges={['top']} className="flex-1 bg-[#f4efe6] font-sans">
+    <SafeAreaView edges={['top']} className="flex-1 bg-[#fcf9f3]/95 font-sans">
       <ScrollView
         className="flex-1"
-        contentContainerClassName="p-4 pb-8 gap-5"
+        contentContainerClassName="pb-8"
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => fetchData(true)} />
         }>
         {/* Hero Section */}
-        <View className="px-1 py-2">
-          <Text className="mb-2 text-center text-2xl font-extrabold uppercase tracking-wider text-[#5b6773]">
-            Smart Speaker
-          </Text>
-          <Text className="mt-1 font-bold text-xl text-[#145374]">
-            {getGreeting()}, {stats.profileName}
-          </Text>
+        <View className="border-b border-[#e0d8d0]/60 bg-[#fcf9f3]/95 px-6 pb-4 pt-3">
+          <View className="w-full flex-row items-center justify-between">
+            <Text className="mr-4 flex-1 text-2xl font-extrabold uppercase tracking-wider text-blue-600">
+              Smart Speaker
+            </Text>
+            <View className="h-14 w-14 flex-shrink-0 items-center justify-center rounded-full">
+              <Image
+                source={require('../../assets/logo.png')}
+                className="h-full w-full"
+                resizeMode="contain"
+              />
+            </View>
+          </View>
+          <View className="mt-3 w-full border-t border-[#e0d8d0]/40 pt-3">
+            <Text className="font-semibold text-lg text-[#1f2933]">
+              {getGreeting()}, {stats.profileName}
+            </Text>
+          </View>
         </View>
 
-        {/* Actionable Cards */}
-        <View className="gap-4">
-          {/* Next Alarm & Timer row */}
-          <View className="flex-row gap-4">
-            <Pressable
-              className="flex-1 rounded-2xl border border-[#e0d8d0] bg-[#fcf9f3] p-4 active:opacity-70"
-              onPress={() => navigation.navigate('Báo thức')}>
-              <View className="mb-2 flex-row items-center gap-2">
-                <Ionicons name="alarm-outline" size={20} color="#145374" />
-                <Text className="font-semibold text-[#5b6773]">Báo thức tới</Text>
-              </View>
-              {stats.nextAlarm ? (
-                <>
-                  <Text className="font-bold text-xl text-[#1f2933]">
-                    {stats.nextAlarm.time ? stats.nextAlarm.time.substring(0, 5) : '--:--'}
-                  </Text>
-                  <Text className="mt-1 text-xs text-[#5b6773]" numberOfLines={1}>
-                    {stats.nextAlarm.label || 'Không có nhãn'}
-                  </Text>
-                </>
-              ) : (
-                <Text className="mt-1 text-sm text-[#5b6773]">Không có</Text>
-              )}
-            </Pressable>
+        <ImageBackground
+          source={require('../../assets/bg.jpg')}
+          className="flex-1 gap-6 py-6"
+          resizeMode="cover">
+          {/* Actionable Cards */}
+          <View className="gap-4 px-4">
+            {/* Next Alarm & Timer row */}
+            <View className="flex-row gap-4">
+              <Pressable
+                className="flex-1 rounded-2xl border border-[#e0d8d0]/60 bg-[#fcf9f3]/95 p-4 shadow-md active:opacity-70"
+                onPress={() => navigation.navigate('Báo thức')}>
+                <View className="mb-2 flex-row items-center gap-2">
+                  <Ionicons name="alarm-outline" size={20} color="#145374" />
+                  <Text className="font-semibold text-[#5b6773]">Báo thức tới</Text>
+                </View>
+                {stats.nextAlarm ? (
+                  <>
+                    <Text className="font-bold text-xl text-[#1f2933]">
+                      {stats.nextAlarm.time ? stats.nextAlarm.time.substring(0, 5) : '--:--'}
+                    </Text>
+                    <Text className="mt-1 text-xs text-[#5b6773]" numberOfLines={1}>
+                      {stats.nextAlarm.label || 'Không có nhãn'}
+                    </Text>
+                  </>
+                ) : (
+                  <Text className="mt-1 text-sm text-[#5b6773]">Không có</Text>
+                )}
+              </Pressable>
 
-            <Pressable
-              className="flex-1 rounded-2xl border border-[#e0d8d0] bg-[#fcf9f3] p-4 active:opacity-70"
-              onPress={() => navigation.navigate('Hẹn giờ')}>
-              <View className="mb-2 flex-row items-center gap-2">
-                <Ionicons name="hourglass-outline" size={20} color="#0d3c52" />
-                <Text className="font-semibold text-[#5b6773]">Hẹn giờ</Text>
-              </View>
-              {stats.activeTimer ? (
-                <>
-                  <Text className="font-bold text-xl text-[#1f2933]">
-                    {getRemainingTimer(stats.activeTimer)}
-                  </Text>
-                  <Text className="mt-1 text-xs text-[#5b6773]" numberOfLines={1}>
-                    {stats.activeTimer.label || 'Đang đếm'}
-                  </Text>
-                </>
-              ) : (
-                <Text className="mt-1 text-sm text-[#5b6773]">Không chạy</Text>
-              )}
-            </Pressable>
-          </View>
-
-          {/* To-Do Preview */}
-          <Pressable
-            className="rounded-2xl border border-[#e0d8d0] bg-[#fcf9f3] p-4 active:opacity-70"
-            onPress={() => navigation.navigate('Ghi chú')}>
-            <View className="mb-3 flex-row items-center justify-between">
-              <View className="flex-row items-center gap-2">
-                <Ionicons name="checkbox-outline" size={20} color="#1f7a58" />
-                <Text className="font-semibold text-[#5b6773]">Việc cần làm</Text>
-              </View>
-              <View className="rounded-full bg-[#1f7a58] px-2 py-0.5">
-                <Text className="font-bold text-xs text-white">{stats.totalNotes}</Text>
-              </View>
+              <Pressable
+                className="flex-1 rounded-2xl border border-[#e0d8d0]/60 bg-[#fcf9f3]/95 p-4 shadow-md active:opacity-70"
+                onPress={() => navigation.navigate('Hẹn giờ')}>
+                <View className="mb-2 flex-row items-center gap-2">
+                  <Ionicons name="hourglass-outline" size={20} color="#0d3c52" />
+                  <Text className="font-semibold text-[#5b6773]">Hẹn giờ</Text>
+                </View>
+                {stats.activeTimer ? (
+                  <>
+                    <Text className="font-bold text-xl text-[#1f2933]">
+                      {getRemainingTimer(stats.activeTimer)}
+                    </Text>
+                    <Text className="mt-1 text-xs text-[#5b6773]" numberOfLines={1}>
+                      {stats.activeTimer.label || 'Đang đếm'}
+                    </Text>
+                  </>
+                ) : (
+                  <Text className="mt-1 text-sm text-[#5b6773]">Không chạy</Text>
+                )}
+              </Pressable>
             </View>
 
-            {stats.topNotes.length > 0 ? (
-              <View className="gap-2">
-                {stats.topNotes.map((note: any, idx: number) => (
-                  <View key={note.item_id || idx} className="flex-row items-center gap-2">
-                    <Ionicons name="ellipse-outline" size={12} color="#a43f24" />
-                    <Text className="flex-1 text-sm text-[#1f2933]" numberOfLines={1}>
-                      {note.content}
+            {/* To-Do Preview */}
+            <Pressable
+              className="rounded-2xl border border-[#e0d8d0]/60 bg-[#fcf9f3]/95 p-4 shadow-md active:opacity-70"
+              onPress={() => navigation.navigate('Ghi chú')}>
+              <View className="mb-3 flex-row items-center justify-between">
+                <View className="flex-row items-center gap-2">
+                  <Ionicons name="checkbox-outline" size={20} color="#1f7a58" />
+                  <Text className="font-semibold text-[#5b6773]">Việc cần làm</Text>
+                </View>
+                <View className="rounded-full bg-[#1f7a58] px-2 py-0.5">
+                  <Text className="font-bold text-xs text-white">{stats.totalNotes}</Text>
+                </View>
+              </View>
+
+              {stats.topNotes.length > 0 ? (
+                <View className="gap-2">
+                  {stats.topNotes.map((note: any, idx: number) => (
+                    <View key={note.item_id || idx} className="flex-row items-center gap-2">
+                      <Ionicons name="ellipse-outline" size={12} color="#a43f24" />
+                      <Text className="flex-1 text-sm text-[#1f2933]" numberOfLines={1}>
+                        {note.content}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <Text className="text-sm text-[#5b6773]">
+                  Tuyệt vời! Bạn đã hoàn thành hết công việc.
+                </Text>
+              )}
+            </Pressable>
+
+            {/* Recent Media */}
+            <Pressable
+              className="rounded-2xl border border-[#e0d8d0]/60 bg-[#fcf9f3]/95 p-4 shadow-md active:opacity-70"
+              onPress={() => navigation.navigate('Cá nhân', { screen: 'MediaHistory' })}>
+              <View className="mb-1 flex-row items-center justify-between">
+                <View className="flex-row items-center gap-2">
+                  <Ionicons name="musical-notes-outline" size={20} color="#a43f24" />
+                  <Text className="font-semibold text-[#5b6773]">Nghe gần đây</Text>
+                </View>
+              </View>
+              {stats.recentMedia ? (
+                <View className="mt-2 flex-row items-center gap-3">
+                  <View className="h-10 w-10 items-center justify-center rounded-full bg-[#e6ecef]">
+                    <Ionicons name="play" size={18} color="#145374" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="font-bold text-[#1f2933]" numberOfLines={1}>
+                      {stats.recentMedia.title}
+                    </Text>
+                    <Text className="mt-0.5 text-xs text-[#5b6773]">
+                      {stats.recentMedia.source || 'Nguồn không xác định'}
                     </Text>
                   </View>
-                ))}
-              </View>
-            ) : (
-              <Text className="text-sm text-[#5b6773]">
-                Tuyệt vời! Bạn đã hoàn thành hết công việc.
-              </Text>
-            )}
-          </Pressable>
-
-          {/* Recent Media */}
-          <Pressable
-            className="rounded-2xl border border-[#e0d8d0] bg-[#fcf9f3] p-4 active:opacity-70"
-            onPress={() => navigation.navigate('Cá nhân', { screen: 'MediaHistory' })}>
-            <View className="mb-1 flex-row items-center justify-between">
-              <View className="flex-row items-center gap-2">
-                <Ionicons name="musical-notes-outline" size={20} color="#a43f24" />
-                <Text className="font-semibold text-[#5b6773]">Nghe gần đây</Text>
-              </View>
-            </View>
-            {stats.recentMedia ? (
-              <View className="mt-2 flex-row items-center gap-3">
-                <View className="h-10 w-10 items-center justify-center rounded-full bg-[#e6ecef]">
-                  <Ionicons name="play" size={18} color="#145374" />
                 </View>
-                <View className="flex-1">
-                  <Text className="font-bold text-[#1f2933]" numberOfLines={1}>
-                    {stats.recentMedia.title}
-                  </Text>
-                  <Text className="mt-0.5 text-xs text-[#5b6773]">
-                    {stats.recentMedia.source || 'Nguồn không xác định'}
-                  </Text>
-                </View>
-              </View>
-            ) : (
-              <Text className="mt-1 text-sm text-[#5b6773]">Chưa có lịch sử nghe nhạc.</Text>
-            )}
-          </Pressable>
-        </View>
-
-        {/* Stats Grid (Quick Summary) */}
-        <View className="mt-2">
-          <Text className="mb-3 ml-1 font-semibold text-xs uppercase tracking-widest text-[#5b6773]">
-            TỔNG QUAN HỆ THỐNG
-          </Text>
-          <View className="flex-row flex-wrap gap-3">
-            <StatCard
-              icon="time"
-              value={stats.activeAlarms}
-              label="Báo thức"
-              iconColor="#145374"
-              onPress={() => navigation.navigate('Báo thức')}
-            />
-            <StatCard
-              icon="hourglass"
-              value={stats.activeTimers}
-              label="Hẹn giờ"
-              iconColor="#0d3c52"
-              onPress={() => navigation.navigate('Hẹn giờ')}
-            />
-            <StatCard
-              icon="document-text"
-              value={stats.totalNotes}
-              label="Ghi chú"
-              iconColor="#1f7a58"
-              onPress={() => navigation.navigate('Ghi chú')}
-            />
-            <StatCard
-              icon="play-circle"
-              value={stats.totalMedia}
-              label="Media history"
-              iconColor="#a43f24"
-              onPress={() => navigation.navigate('Cá nhân', { screen: 'MediaHistory' })}
-            />
+              ) : (
+                <Text className="mt-1 text-sm text-[#5b6773]">Chưa có lịch sử nghe nhạc.</Text>
+              )}
+            </Pressable>
           </View>
-        </View>
+
+          {/* Stats Grid (Quick Summary) */}
+          <View className="mt-2 px-4">
+            <Text className="text-md mb-3 ml-1 font-semibold uppercase tracking-widest text-white">
+              TỔNG QUAN HỆ THỐNG
+            </Text>
+            <View className="flex-row flex-wrap gap-3">
+              <StatCard
+                icon="time"
+                value={stats.activeAlarms}
+                label="Báo thức"
+                iconColor="#145374"
+                onPress={() => navigation.navigate('Báo thức')}
+              />
+              <StatCard
+                icon="hourglass"
+                value={stats.activeTimers}
+                label="Hẹn giờ"
+                iconColor="#0d3c52"
+                onPress={() => navigation.navigate('Hẹn giờ')}
+              />
+              <StatCard
+                icon="document-text"
+                value={stats.totalNotes}
+                label="Ghi chú"
+                iconColor="#1f7a58"
+                onPress={() => navigation.navigate('Ghi chú')}
+              />
+              <StatCard
+                icon="play-circle"
+                value={stats.totalMedia}
+                label="Media history"
+                iconColor="#a43f24"
+                onPress={() => navigation.navigate('Cá nhân', { screen: 'MediaHistory' })}
+              />
+            </View>
+          </View>
+        </ImageBackground>
       </ScrollView>
     </SafeAreaView>
   );
