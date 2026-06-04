@@ -28,7 +28,9 @@ Important fields:
 - `GROQ_STT_BASE_URL`: optional override for Groq-compatible base URL
 - `VOICE_BACKEND_PORT`: HTTP port for this service, usually `8387`
 - `VOICE_BACKEND_PUBLIC_BASE_URL`: base URL that the ESP can reach to fetch TTS/media assets
-- `GOOGLE_API_KEY`: required for the LLM orchestration
+- `OPENROUTER_API_KEY`: required for the LLM orchestration
+- `OPENROUTER_BASE_URL`: optional OpenRouter chat completions endpoint override
+- `OPENROUTER_REASONING_ENABLED`: set `false` for low-latency non-thinking calls
 - `YT_DLP_BIN`: needed for YouTube search/stream resolution
 - `FFMPEG_BIN`: needed for media WAV transcoding
 

@@ -2,25 +2,10 @@ from __future__ import annotations
 
 import json
 import logging
+from types import SimpleNamespace
 from typing import Any
 
-try:
-    from langchain_core.messages import HumanMessage
-except ModuleNotFoundError:
-    class HumanMessage:  # type: ignore[override]
-        def __init__(self, content: str):
-            self.content = content
-
-
-try:
-    from langchain_google_genai import ChatGoogleGenerativeAI
-except ModuleNotFoundError:
-    class ChatGoogleGenerativeAI:  # type: ignore[override]
-        def __init__(self, *args, **kwargs):
-            pass
-
-        def invoke(self, *args, **kwargs):
-            raise RuntimeError("langchain_google_genai is not installed in this environment")
+import requests
 
 from assistant_core.prompts import (
     CLARIFICATION_RESOLVER_SYSTEM_PROMPT,
@@ -40,15 +25,94 @@ from assistant_core.prompts import (
     get_group_system_prompt,
 )
 from assistant_core.utils import build_tool_context_string, extract_json_from_response
-from config import LLM_MAX_TOKENS, LLM_TEMPERATURE, SMALL_LLM_MODEL
+from config import (
+    LLM_MAX_TOKENS,
+    LLM_TEMPERATURE,
+    OPENROUTER_BASE_URL,
+    OPENROUTER_REASONING_ENABLED,
+    SMALL_LLM_MODEL,
+)
 
 logger = logging.getLogger(__name__)
+
+
+class OpenRouterChatClient:
+    def __init__(
+        self,
+        *,
+        model: str,
+        api_key: str | None,
+        temperature: float,
+        max_output_tokens: int,
+    ) -> None:
+        self.model = model
+        self.api_key = api_key or ""
+        self.temperature = temperature
+        self.max_output_tokens = max_output_tokens
+
+    def invoke(self, messages: list[Any]):
+        if not self.api_key:
+            raise RuntimeError("OPENROUTER_API_KEY is not configured")
+
+        content = ""
+        if messages:
+            first = messages[0]
+            content = str(getattr(first, "content", first) or "")
+
+        response = requests.post(
+            OPENROUTER_BASE_URL,
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": self.model,
+                "messages": [{"role": "user", "content": content}],
+                "temperature": self.temperature,
+                "max_tokens": self.max_output_tokens,
+                "reasoning": {"enabled": bool(OPENROUTER_REASONING_ENABLED)},
+            },
+            timeout=60,
+        )
+        response.raise_for_status()
+        data = response.json()
+        choices = data.get("choices") or []
+        message = choices[0].get("message", {}) if choices else {}
+        return SimpleNamespace(
+            content=_normalize_openrouter_content(message.get("content")),
+            reasoning_details=message.get("reasoning_details"),
+        )
+
+
+def _normalize_openrouter_content(content: Any) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, dict):
+                if item.get("type") == "thinking":
+                    continue
+                text = item.get("text") or item.get("content")
+                if isinstance(text, str) and text.strip():
+                    parts.append(text.strip())
+            elif isinstance(item, str) and item.strip():
+                parts.append(item.strip())
+        return "\n".join(parts)
+    return "" if content is None else str(content)
+
+
+def _response_text(response: Any) -> str:
+    if isinstance(response, str):
+        return response
+    content = getattr(response, "content", response)
+    return _normalize_openrouter_content(content)
 
 
 class LLMWrapper:
     def __init__(
         self,
-        model: str = "gemma-3-4b-it",
+        model: str = "google/gemma-3-4b-it",
         api_key: str | None = None,
         confirmation_model: str | None = None,
         temperature: float | None = None,
@@ -92,9 +156,9 @@ class LLMWrapper:
         temperature: float,
         max_output_tokens: int,
     ):
-        return ChatGoogleGenerativeAI(
+        return OpenRouterChatClient(
             model=model,
-            google_api_key=api_key,
+            api_key=api_key,
             temperature=temperature,
             max_output_tokens=max_output_tokens,
         )
@@ -109,7 +173,7 @@ class LLMWrapper:
 
     def _invoke_with_client(self, llm_client, instruction: str, user_prompt: str):
         combined_prompt = self._build_combined_prompt(instruction, user_prompt)
-        return llm_client.invoke([HumanMessage(content=combined_prompt)])
+        return llm_client.invoke([SimpleNamespace(content=combined_prompt)])
 
     def _invoke_with_instruction(self, instruction: str, user_prompt: str):
         return self._invoke_with_client(self.llm, instruction, user_prompt)
@@ -118,6 +182,7 @@ class LLMWrapper:
         return self._invoke_with_client(self.confirmation_llm, instruction, user_prompt)
 
     def _parse_json_output(self, response_text: Any, fallback: dict[str, Any]) -> dict[str, Any]:
+        response_text = _response_text(response_text)
         if not isinstance(response_text, str):
             return fallback
         parsed = extract_json_from_response(response_text)

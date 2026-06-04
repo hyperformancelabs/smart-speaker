@@ -4,7 +4,7 @@ from functools import lru_cache
 from types import SimpleNamespace
 from typing import Any
 
-from config import GOOGLE_API_KEY, LLM_MODEL
+from config import LLM_MODEL, OPENROUTER_API_KEY
 from assistant_tools.registry import TOOL_FUNCTIONS
 
 from assistant_core.nodes import (
@@ -46,7 +46,7 @@ def _build_initial_state(payload: dict[str, Any]) -> LLMState:
 
 
 def _build_runtime() -> SimpleNamespace:
-    llm = LLMWrapper(model=LLM_MODEL, api_key=GOOGLE_API_KEY)
+    llm = LLMWrapper(model=LLM_MODEL, api_key=OPENROUTER_API_KEY)
     context = LLMContext(
         llm=llm,
         tools=TOOL_FUNCTIONS,
@@ -63,7 +63,7 @@ def _get_pipeline_graph():
     except ModuleNotFoundError:
         return None
 
-    llm = LLMWrapper(model=LLM_MODEL, api_key=GOOGLE_API_KEY)
+    llm = LLMWrapper(model=LLM_MODEL, api_key=OPENROUTER_API_KEY)
     return build_llm_graph(
         llm=llm,
         tools=TOOL_FUNCTIONS,

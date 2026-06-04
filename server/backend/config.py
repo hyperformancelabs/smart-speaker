@@ -18,9 +18,11 @@ def _getenv_csv(name: str, default: str = "") -> tuple[str, ...]:
     return tuple(part.strip() for part in raw_value.split(",") if part.strip())
 
 # LLM configuration
-LLM_MODEL = os.getenv("LLM_MODEL", "gemma-3-27b-it")
-SMALL_LLM_MODEL = os.getenv("SMALL_LLM_MODEL", "gemma-3-4b-it")
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
+LLM_MODEL = os.getenv("LLM_MODEL", "google/gemma-3-27b-it")
+SMALL_LLM_MODEL = os.getenv("SMALL_LLM_MODEL", "google/gemma-3-4b-it")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "").strip()
+OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1/chat/completions").strip()
+OPENROUTER_REASONING_ENABLED = os.getenv("OPENROUTER_REASONING_ENABLED", "false").strip().lower() in {"true", "1", "yes"}
 LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.7"))
 LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "1024"))
 
