@@ -163,23 +163,31 @@ class LLMWrapper:
             max_output_tokens=max_output_tokens,
         )
 
-    def _build_combined_prompt(self, instruction: str, user_prompt: str) -> str:
+    def _build_combined_prompt(
+        self,
+        instruction: str,
+        user_prompt: str,
+        *,
+        context_block: str = "",
+    ) -> str:
+        context_text = f"\n\n{context_block.strip()}\n" if context_block.strip() else "\n"
         return (
             "Huong dan he thong:\n"
             f"{instruction.strip()}\n\n"
+            f"{context_text}"
             "Yeu cau nguoi dung:\n"
             f"{user_prompt.strip()}"
         )
 
-    def _invoke_with_client(self, llm_client, instruction: str, user_prompt: str):
-        combined_prompt = self._build_combined_prompt(instruction, user_prompt)
+    def _invoke_with_client(self, llm_client, instruction: str, user_prompt: str, *, context_block: str = ""):
+        combined_prompt = self._build_combined_prompt(instruction, user_prompt, context_block=context_block)
         return llm_client.invoke([SimpleNamespace(content=combined_prompt)])
 
-    def _invoke_with_instruction(self, instruction: str, user_prompt: str):
-        return self._invoke_with_client(self.llm, instruction, user_prompt)
+    def _invoke_with_instruction(self, instruction: str, user_prompt: str, *, context_block: str = ""):
+        return self._invoke_with_client(self.llm, instruction, user_prompt, context_block=context_block)
 
-    def _invoke_confirmation_with_instruction(self, instruction: str, user_prompt: str):
-        return self._invoke_with_client(self.confirmation_llm, instruction, user_prompt)
+    def _invoke_confirmation_with_instruction(self, instruction: str, user_prompt: str, *, context_block: str = ""):
+        return self._invoke_with_client(self.confirmation_llm, instruction, user_prompt, context_block=context_block)
 
     def _parse_json_output(self, response_text: Any, fallback: dict[str, Any]) -> dict[str, Any]:
         response_text = _response_text(response_text)
@@ -297,7 +305,13 @@ class LLMWrapper:
         conversation_transcript: str,
         session_mode: str,
         pending_summary: str,
+        system_prompt_context: str = "",
+        memory_context: str = "",
+        preferences_context: str = "",
     ) -> dict[str, Any]:
+        context_block = "\n".join(
+            part for part in [system_prompt_context.strip(), memory_context.strip(), preferences_context.strip()] if part
+        )
         prompt = ROUTER_USER_PROMPT_TEMPLATE.format(
             user_input=user_input,
             conversation_summary=conversation_summary,
@@ -305,6 +319,8 @@ class LLMWrapper:
             session_mode=session_mode,
             pending_summary=pending_summary,
         )
+        if context_block:
+            prompt = f"{context_block}\n\n{prompt}"
         response = self._invoke_with_instruction(ROUTER_SYSTEM_PROMPT, prompt)
         response_text = response.content
         route_data = self._parse_json_output(
@@ -376,7 +392,13 @@ class LLMWrapper:
         session_mode: str,
         return_mode: str,
         pending_summary: str,
+        system_prompt_context: str = "",
+        memory_context: str = "",
+        preferences_context: str = "",
     ) -> dict[str, Any]:
+        context_block = "\n".join(
+            part for part in [system_prompt_context.strip(), memory_context.strip(), preferences_context.strip()] if part
+        )
         tool_context = build_tool_context_string(tools_available) if tools_available else "(không có tool trực tiếp ở group này)"
         system_prompt = get_group_system_prompt(group)
         user_prompt = GROUP_AGENT_USER_PROMPT_TEMPLATE.format(
@@ -395,6 +417,8 @@ class LLMWrapper:
             tool_context=tool_context,
             user_input=user_input,
         )
+        if context_block:
+            user_prompt = f"{context_block}\n\n{user_prompt}"
         response = self._invoke_with_instruction(system_prompt, user_prompt)
         response_text = str(response.content if response.content is not None else "")
 
@@ -494,7 +518,13 @@ class LLMWrapper:
         conversation_summary: str,
         conversation_transcript: str,
         session_mode: str,
+        system_prompt_context: str = "",
+        memory_context: str = "",
+        preferences_context: str = "",
     ) -> dict[str, Any]:
+        context_block = "\n".join(
+            part for part in [system_prompt_context.strip(), memory_context.strip(), preferences_context.strip()] if part
+        )
         compact_results = self._build_compact_tool_results(tool_results)
 
         user_prompt = TOOL_RESULT_USER_PROMPT_TEMPLATE.format(
@@ -510,6 +540,8 @@ class LLMWrapper:
             answer_policy_json=json.dumps(answer_policy or {}, ensure_ascii=False, indent=2),
             tool_results_json=json.dumps(compact_results, ensure_ascii=False, indent=2),
         )
+        if context_block:
+            user_prompt = f"{context_block}\n\n{user_prompt}"
         response = self._invoke_with_instruction(TOOL_RESULT_SYSTEM_PROMPT, user_prompt)
         response_text = response.content
         parsed = self._parse_json_output(
@@ -602,6 +634,126 @@ class LLMWrapper:
             "follow_up_mode": follow_up_mode,
             "should_strip_follow_up_offer": bool(parsed.get("should_strip_follow_up_offer", True)),
             "answer_outline": parsed.get("answer_outline", []) if isinstance(parsed.get("answer_outline"), list) else [],
+        }
+
+    def select_media_search_result(
+        self,
+        *,
+        user_input: str,
+        query: str,
+        mode: str,
+        search_results: list[dict[str, Any]],
+        response_preferences: str,
+        task_summary: str,
+        task_transcript: str,
+        conversation_summary: str,
+        conversation_transcript: str,
+        session_mode: str,
+    ) -> dict[str, Any]:
+        compact_results = []
+        for index, item in enumerate(search_results[:5], start=1):
+            compact_results.append(
+                {
+                    "index": index,
+                    "title": item.get("title"),
+                    "channel": item.get("channel"),
+                    "video_id": item.get("video_id"),
+                    "webpage_url": item.get("webpage_url"),
+                    "duration_seconds": item.get("duration_seconds"),
+                }
+            )
+
+        system_prompt = """
+Bạn là media result selector cho voice assistant.
+
+Nhiệm vụ:
+- Chọn video khớp nhất từ danh sách kết quả search YouTube đã có sẵn.
+- Không search lại, không gọi tool, không bịa thêm video mới.
+- Nếu có kết quả đủ rõ thì trả `choose`.
+- Nếu tất cả đều quá mơ hồ thì trả `clarify`.
+- Chỉ trả về một JSON hợp lệ, không markdown.
+
+Return JSON:
+{
+  "decision": "choose|clarify",
+  "selected_index": 1,
+  "selected_video_id": "abc123",
+  "selected_mode": "audio|video",
+  "assistant_text": "câu trả lời ngắn cho TTS",
+  "reason": "ngắn gọn",
+  "confidence": 0.0
+}
+""".strip()
+
+        user_prompt = f"""
+<session_mode>{session_mode}</session_mode>
+<response_preferences>
+{response_preferences}
+</response_preferences>
+<task_summary>
+{task_summary}
+</task_summary>
+<task_transcript>
+{task_transcript}
+</task_transcript>
+<parent_conversation_summary>
+{conversation_summary}
+</parent_conversation_summary>
+<parent_conversation_transcript>
+{conversation_transcript}
+</parent_conversation_transcript>
+<user_input>{user_input}</user_input>
+<normalized_query>{query}</normalized_query>
+<mode>{mode}</mode>
+<search_results_json>
+{json.dumps(compact_results, ensure_ascii=False, indent=2)}
+</search_results_json>
+""".strip()
+
+        try:
+            response = self._invoke_confirmation_with_instruction(system_prompt, user_prompt)
+        except Exception as exc:
+            if self.confirmation_llm is self.llm:
+                raise
+            logger.warning(
+                "Media selector model '%s' failed; falling back to main model '%s': %s",
+                self.confirmation_model_name,
+                self.model_name,
+                exc,
+            )
+            response = self._invoke_with_instruction(system_prompt, user_prompt)
+
+        parsed = self._parse_json_output(
+            response.content,
+            {
+                "decision": "choose",
+                "selected_index": 1,
+                "selected_video_id": "",
+                "selected_mode": mode,
+                "assistant_text": "",
+                "reason": "fallback",
+                "confidence": 0.5,
+            },
+        )
+        decision = str(parsed.get("decision", "choose") or "choose")
+        if decision not in {"choose", "clarify"}:
+            decision = "choose"
+        selected_mode = str(parsed.get("selected_mode", mode) or mode).strip().lower()
+        if selected_mode not in {"audio", "video"}:
+            selected_mode = mode if mode in {"audio", "video"} else "audio"
+        selected_index = int(parsed.get("selected_index", 1) or 1)
+        selected_video_id = str(parsed.get("selected_video_id", "") or "").strip()
+        if not selected_video_id and 1 <= selected_index <= len(compact_results):
+            selected_video_id = str(compact_results[selected_index - 1].get("video_id") or "").strip()
+
+        return {
+            "decision": decision,
+            "selected_index": selected_index,
+            "selected_video_id": selected_video_id,
+            "selected_mode": selected_mode,
+            "assistant_text": str(parsed.get("assistant_text", "") or ""),
+            "reason": str(parsed.get("reason", "") or ""),
+            "confidence": float(parsed.get("confidence", 0.5) or 0.5),
         }
 
     def resolve_confirmation_reply(
