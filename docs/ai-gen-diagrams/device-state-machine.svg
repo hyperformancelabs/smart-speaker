@@ -1,0 +1,152 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="980" viewBox="0 0 1600 980" role="img" aria-labelledby="title desc">
+  <title id="title">Device State Machine</title>
+  <desc id="desc">ESP32 device state machine showing startup, NFC login, wakeword waiting, streaming, thinking, speaking, schedule alert, Wi-Fi reconnect, and return to wakeword.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#202020"/>
+    </marker>
+    <style>
+      .title { font: 700 48px Arial, sans-serif; fill: #111; }
+      .subtitle { font: 400 18px Arial, sans-serif; fill: #333; }
+      .state { fill: #fff; stroke: #202020; stroke-width: 3; }
+      .soft { fill: #fafafa; stroke: #555; stroke-width: 2.2; }
+      .interrupt { fill: #fff; stroke: #202020; stroke-width: 3; stroke-dasharray: 9 7; }
+      .label { font: 700 23px Arial, sans-serif; fill: #111; }
+      .text { font: 400 15px Arial, sans-serif; fill: #222; }
+      .small { font: 400 13px Arial, sans-serif; fill: #333; }
+      .line { stroke: #202020; stroke-width: 2.8; fill: none; marker-end: url(#arrow); }
+      .return { stroke: #555; stroke-width: 2.4; fill: none; stroke-dasharray: 7 6; marker-end: url(#arrow); }
+      .note { fill: #fafafa; stroke: #777; stroke-width: 1.5; }
+      .noteText { font: 400 15px Arial, sans-serif; fill: #222; }
+      .section { font: 700 18px Arial, sans-serif; fill: #111; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="980" fill="#fff"/>
+
+  <text x="80" y="70" class="title">Device State Machine</text>
+  <text x="80" y="104" class="subtitle">ESP32 UI and audio-session states from boot, NFC identity, wakeword waiting, streaming, backend processing, playback, and recovery paths.</text>
+
+  <!-- Section labels -->
+  <text x="230" y="155" text-anchor="middle" class="section">Onboarding / Identity</text>
+  <text x="835" y="155" text-anchor="middle" class="section">Voice Interaction Loop</text>
+  <text x="1340" y="155" text-anchor="middle" class="section">Interrupt / Recovery</text>
+
+  <!-- Onboarding states -->
+  <rect x="90" y="190" width="250" height="74" rx="14" class="state"/>
+  <text x="215" y="220" text-anchor="middle" class="label">Splash / Startup</text>
+  <text x="215" y="244" text-anchor="middle" class="small">OLED splash, Wi-Fi init</text>
+
+  <rect x="90" y="325" width="250" height="74" rx="14" class="state"/>
+  <text x="215" y="355" text-anchor="middle" class="label">Await NFC</text>
+  <text x="215" y="379" text-anchor="middle" class="small">device waits for identity card</text>
+
+  <rect x="90" y="460" width="250" height="74" rx="14" class="state"/>
+  <text x="215" y="490" text-anchor="middle" class="label">Loading Profile</text>
+  <text x="215" y="514" text-anchor="middle" class="small">profile lookup + schedule sync</text>
+
+  <rect x="90" y="595" width="250" height="74" rx="14" class="soft"/>
+  <text x="215" y="625" text-anchor="middle" class="label">Register / Error</text>
+  <text x="215" y="649" text-anchor="middle" class="small">QR prompt or lookup error</text>
+
+  <rect x="410" y="460" width="250" height="74" rx="14" class="state"/>
+  <text x="535" y="490" text-anchor="middle" class="label">Greeting</text>
+  <text x="535" y="514" text-anchor="middle" class="small">personalized hello, 3 seconds</text>
+
+  <!-- Voice loop states -->
+  <rect x="710" y="245" width="250" height="84" rx="14" class="state"/>
+  <text x="835" y="278" text-anchor="middle" class="label">Wait Wakeword</text>
+  <text x="835" y="302" text-anchor="middle" class="small">sleep screen + local classifier</text>
+
+  <rect x="710" y="410" width="250" height="84" rx="14" class="state"/>
+  <text x="835" y="443" text-anchor="middle" class="label">Streaming</text>
+  <text x="835" y="467" text-anchor="middle" class="small">mic capture + WS audio packets</text>
+
+  <rect x="710" y="575" width="250" height="84" rx="14" class="state"/>
+  <text x="835" y="608" text-anchor="middle" class="label">Thinking</text>
+  <text x="835" y="632" text-anchor="middle" class="small">backend VAD, STT, agent, tools</text>
+
+  <rect x="710" y="740" width="250" height="84" rx="14" class="state"/>
+  <text x="835" y="773" text-anchor="middle" class="label">Speaking</text>
+  <text x="835" y="797" text-anchor="middle" class="small">TTS playback, optional media</text>
+
+  <!-- Interrupt states -->
+  <rect x="1215" y="245" width="250" height="84" rx="14" class="interrupt"/>
+  <text x="1340" y="278" text-anchor="middle" class="label">Wi-Fi Reconnect</text>
+  <text x="1340" y="302" text-anchor="middle" class="small">temporary overlay, resume state</text>
+
+  <rect x="1215" y="520" width="250" height="84" rx="14" class="interrupt"/>
+  <text x="1340" y="553" text-anchor="middle" class="label">Schedule Alert</text>
+  <text x="1340" y="577" text-anchor="middle" class="small">alarm/timer active alert</text>
+
+  <rect x="1215" y="740" width="250" height="84" rx="14" class="soft"/>
+  <text x="1340" y="773" text-anchor="middle" class="label">NFC Interrupt</text>
+  <text x="1340" y="797" text-anchor="middle" class="small">tap while thinking/speaking</text>
+
+  <!-- Onboarding arrows -->
+  <path d="M215 264 L215 325" class="line"/>
+  <text x="250" y="300" class="small">Wi-Fi ready</text>
+
+  <path d="M215 399 L215 460" class="line"/>
+  <text x="250" y="435" class="small">NFC tapped</text>
+
+  <path d="M340 497 L410 497" class="line"/>
+  <text x="375" y="480" text-anchor="middle" class="small">profile ok</text>
+
+  <path d="M215 534 L215 595" class="line"/>
+  <text x="250" y="570" class="small">missing / error</text>
+
+  <path d="M535 460 C535 360 650 287 710 287" class="line"/>
+  <text x="590" y="380" class="small">after greeting</text>
+
+  <path d="M340 632 C470 632 520 560 520 534" class="return"/>
+  <text x="430" y="610" text-anchor="middle" class="small">tap NFC again</text>
+
+  <!-- Voice loop arrows -->
+  <path d="M835 329 L835 410" class="line"/>
+  <text x="870" y="375" class="small">wake detected</text>
+
+  <path d="M835 494 L835 575" class="line"/>
+  <text x="870" y="540" class="small">speech segment found</text>
+
+  <path d="M835 659 L835 740" class="line"/>
+  <text x="870" y="705" class="small">assistant_playback</text>
+
+  <path d="M710 782 C545 782 545 287 710 287" class="return"/>
+  <text x="570" y="735" text-anchor="middle" class="small">playback done / final_state</text>
+
+  <path d="M710 452 C590 452 590 287 710 287" class="return"/>
+  <text x="600" y="420" text-anchor="middle" class="small">no speech timeout</text>
+
+  <path d="M960 617 C1090 617 1090 287 960 287" class="return"/>
+  <text x="1065" y="455" text-anchor="middle" class="small">error / cancel / wait_wakeword</text>
+
+  <!-- Interrupt arrows -->
+  <path d="M960 287 L1215 287" class="return"/>
+  <text x="1088" y="267" text-anchor="middle" class="small">Wi-Fi lost from active modes</text>
+  <path d="M1215 315 L960 315" class="return"/>
+  <text x="1088" y="342" text-anchor="middle" class="small">Wi-Fi ready, resume</text>
+
+  <path d="M1215 562 L960 452" class="return"/>
+  <text x="1090" y="525" text-anchor="middle" class="small">dismiss / tap NFC</text>
+  <path d="M960 452 L1215 562" class="return"/>
+  <text x="1090" y="482" text-anchor="middle" class="small">alarm/timer due</text>
+
+  <path d="M1215 782 L960 287" class="return"/>
+  <text x="1090" y="750" text-anchor="middle" class="small">clear token, stop active task</text>
+  <path d="M960 782 L1215 782" class="return"/>
+  <text x="1088" y="810" text-anchor="middle" class="small">NFC tap during thinking/speaking</text>
+
+  <!-- Backend control note -->
+  <rect x="420" y="865" width="760" height="70" rx="12" class="note"/>
+  <text x="450" y="894" class="noteText">Backend control states: wait_wakeword, streaming, thinking, speaking.</text>
+  <text x="450" y="918" class="noteText">Firmware maps them to UI modes and cleans queues before re-entering Wait Wakeword.</text>
+
+  <rect x="70" y="865" width="295" height="70" rx="12" class="note"/>
+  <text x="100" y="894" class="noteText">Main invariant:</text>
+  <text x="100" y="918" class="noteText">sleep screen = wakeword detection active.</text>
+
+  <rect x="1235" y="865" width="295" height="70" rx="12" class="note"/>
+  <text x="1265" y="894" class="noteText">NFC can recover active modes:</text>
+  <text x="1265" y="918" class="noteText">invalidate token, return to wakeword.</text>
+</svg>
