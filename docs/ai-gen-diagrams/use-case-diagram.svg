@@ -1,0 +1,218 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" role="img" aria-labelledby="title desc">
+  <title id="title">Use Case Diagram</title>
+  <desc id="desc">Use case diagram for the context-aware smart speaker system with voice, NFC, web, mobile, database, ESP32 device, and external AI services.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#1d1d1f"/>
+    </marker>
+    <style>
+      .title { font: 700 44px Arial, sans-serif; fill: #111; }
+      .subtitle { font: 400 18px Arial, sans-serif; fill: #333; }
+      .label { font: 600 19px Arial, sans-serif; fill: #111; }
+      .small { font: 400 15px Arial, sans-serif; fill: #333; }
+      .actor-label { font: 700 19px Arial, sans-serif; fill: #111; text-anchor: middle; }
+      .system { fill: #fff; stroke: #111; stroke-width: 2.2; rx: 24; }
+      .zone { fill: #fafafa; stroke: #8a8a8a; stroke-width: 1.5; stroke-dasharray: 7 6; rx: 18; }
+      .oval { fill: #fff; stroke: #111; stroke-width: 2.1; }
+      .line { fill: none; stroke: #1d1d1f; stroke-width: 2; }
+      .thin { fill: none; stroke: #444; stroke-width: 1.6; }
+      .include { fill: none; stroke: #555; stroke-width: 1.5; stroke-dasharray: 6 5; marker-end: url(#arrow); }
+      .include-label { font: 400 13px Arial, sans-serif; fill: #333; }
+      .note { fill: #fbfbfb; stroke: #777; stroke-width: 1.2; rx: 12; }
+      .mono { font: 400 14px "Courier New", monospace; fill: #222; }
+    </style>
+  </defs>
+
+  <text x="80" y="62" class="title">Use Case Diagram</text>
+  <text x="80" y="95" class="subtitle">Main user goals and supporting systems for the context-aware smart speaker.</text>
+
+  <!-- System boundary -->
+  <rect x="265" y="130" width="1070" height="760" class="system"/>
+  <text x="800" y="166" text-anchor="middle" class="label">Context-Aware Smart Speaker System</text>
+
+  <!-- Zones inside system -->
+  <rect x="305" y="195" width="990" height="210" class="zone"/>
+  <text x="330" y="226" class="label">Voice Interaction</text>
+
+  <rect x="305" y="430" width="990" height="245" class="zone"/>
+  <text x="330" y="461" class="label">Personal Actions and Tools</text>
+
+  <rect x="305" y="700" width="990" height="155" class="zone"/>
+  <text x="330" y="731" class="label">Web / Mobile Management</text>
+
+  <!-- Actors left -->
+  <g id="end-user" transform="translate(125 230)">
+    <circle cx="0" cy="0" r="22" fill="#fff" stroke="#111" stroke-width="2"/>
+    <path d="M0 22 L0 88 M-45 48 L45 48 M0 88 L-38 140 M0 88 L38 140" class="line"/>
+    <text x="0" y="180" class="actor-label">End User</text>
+    <text x="0" y="203" class="small" text-anchor="middle">voice + NFC</text>
+  </g>
+
+  <g id="web-mobile-user" transform="translate(125 695)">
+    <circle cx="0" cy="0" r="22" fill="#fff" stroke="#111" stroke-width="2"/>
+    <path d="M0 22 L0 88 M-45 48 L45 48 M0 88 L-38 140 M0 88 L38 140" class="line"/>
+    <text x="0" y="180" class="actor-label">Web / Mobile User</text>
+    <text x="0" y="203" class="small" text-anchor="middle">dashboard + app</text>
+  </g>
+
+  <!-- Actors right -->
+  <g id="esp-device" transform="translate(1480 240)">
+    <circle cx="0" cy="0" r="22" fill="#fff" stroke="#111" stroke-width="2"/>
+    <path d="M0 22 L0 88 M-45 48 L45 48 M0 88 L-38 140 M0 88 L38 140" class="line"/>
+    <text x="0" y="180" class="actor-label">ESP32 Device</text>
+    <text x="0" y="203" class="small" text-anchor="middle">edge runtime</text>
+  </g>
+
+  <g id="external-services" transform="translate(1480 535)">
+    <circle cx="0" cy="0" r="22" fill="#fff" stroke="#111" stroke-width="2"/>
+    <path d="M0 22 L0 88 M-45 48 L45 48 M0 88 L-38 140 M0 88 L38 140" class="line"/>
+    <text x="0" y="180" class="actor-label">AI / Media</text>
+    <text x="0" y="203" class="small" text-anchor="middle">LLM, STT, TTS, search</text>
+  </g>
+
+  <g id="database-api" transform="translate(1480 790)">
+    <circle cx="0" cy="0" r="22" fill="#fff" stroke="#111" stroke-width="2"/>
+    <path d="M0 22 L0 88 M-45 48 L45 48 M0 88 L-38 140 M0 88 L38 140" class="line"/>
+    <text x="0" y="180" class="actor-label">Database API</text>
+    <text x="0" y="203" class="small" text-anchor="middle">profile + data store</text>
+  </g>
+
+  <!-- Voice interaction use cases -->
+  <ellipse cx="455" cy="285" rx="115" ry="42" class="oval"/>
+  <text x="455" y="280" class="label" text-anchor="middle">Identify User</text>
+  <text x="455" y="304" class="small" text-anchor="middle">NFC profile lookup</text>
+
+  <ellipse cx="685" cy="285" rx="122" ry="42" class="oval"/>
+  <text x="685" y="280" class="label" text-anchor="middle">Wake Speaker</text>
+  <text x="685" y="304" class="small" text-anchor="middle">local wake word</text>
+
+  <ellipse cx="930" cy="285" rx="128" ry="42" class="oval"/>
+  <text x="930" y="280" class="label" text-anchor="middle">Ask by Voice</text>
+  <text x="930" y="304" class="small" text-anchor="middle">stream speech audio</text>
+
+  <ellipse cx="1160" cy="285" rx="112" ry="42" class="oval"/>
+  <text x="1160" y="280" class="label" text-anchor="middle">Hear Reply</text>
+  <text x="1160" y="304" class="small" text-anchor="middle">TTS / media playback</text>
+
+  <ellipse cx="570" cy="365" rx="114" ry="32" class="oval"/>
+  <text x="570" y="371" class="small" text-anchor="middle">Transcribe speech</text>
+
+  <ellipse cx="820" cy="365" rx="128" ry="32" class="oval"/>
+  <text x="820" y="371" class="small" text-anchor="middle">Run single-turn agent</text>
+
+  <ellipse cx="1070" cy="365" rx="105" ry="32" class="oval"/>
+  <text x="1070" y="371" class="small" text-anchor="middle">Generate TTS</text>
+
+  <!-- Tool use cases -->
+  <ellipse cx="455" cy="525" rx="125" ry="42" class="oval"/>
+  <text x="455" y="520" class="label" text-anchor="middle">Play Media</text>
+  <text x="455" y="544" class="small" text-anchor="middle">YouTube / audio</text>
+
+  <ellipse cx="705" cy="525" rx="126" ry="42" class="oval"/>
+  <text x="705" y="520" class="label" text-anchor="middle">Ask Information</text>
+  <text x="705" y="544" class="small" text-anchor="middle">web search / calculate</text>
+
+  <ellipse cx="965" cy="525" rx="140" ry="42" class="oval"/>
+  <text x="965" y="520" class="label" text-anchor="middle">Manage Schedules</text>
+  <text x="965" y="544" class="small" text-anchor="middle">alarms + timers by voice</text>
+
+  <ellipse cx="455" cy="625" rx="138" ry="42" class="oval"/>
+  <text x="455" y="620" class="label" text-anchor="middle">Manage Lists</text>
+  <text x="455" y="644" class="small" text-anchor="middle">create, add, update, read</text>
+
+  <ellipse cx="705" cy="625" rx="132" ry="42" class="oval"/>
+  <text x="705" y="620" class="label" text-anchor="middle">Manage Memory</text>
+  <text x="705" y="644" class="small" text-anchor="middle">save, read, reset</text>
+
+  <ellipse cx="965" cy="625" rx="132" ry="42" class="oval"/>
+  <text x="965" y="620" class="label" text-anchor="middle">Update Profile</text>
+  <text x="965" y="644" class="small" text-anchor="middle">name + preferences</text>
+
+  <ellipse cx="1190" cy="575" rx="86" ry="42" class="oval"/>
+  <text x="1190" y="570" class="label" text-anchor="middle">Log</text>
+  <text x="1190" y="594" class="small" text-anchor="middle">history</text>
+
+  <!-- UI management use cases -->
+  <ellipse cx="455" cy="790" rx="118" ry="42" class="oval"/>
+  <text x="455" y="785" class="label" text-anchor="middle">Sign In / Register</text>
+  <text x="455" y="809" class="small" text-anchor="middle">NFC account</text>
+
+  <ellipse cx="700" cy="790" rx="118" ry="42" class="oval"/>
+  <text x="700" y="785" class="label" text-anchor="middle">View Dashboard</text>
+  <text x="700" y="809" class="small" text-anchor="middle">overview + status</text>
+
+  <ellipse cx="945" cy="790" rx="128" ry="42" class="oval"/>
+  <text x="945" y="785" class="label" text-anchor="middle">Edit Personal Data</text>
+  <text x="945" y="809" class="small" text-anchor="middle">lists, notes, profile</text>
+
+  <ellipse cx="1170" cy="790" rx="105" ry="42" class="oval"/>
+  <text x="1170" y="785" class="label" text-anchor="middle">View Schedules</text>
+  <text x="1170" y="809" class="small" text-anchor="middle">alarms + timers</text>
+
+  <!-- Actor associations -->
+  <path d="M170 290 L340 285" class="line"/>
+  <path d="M170 300 L565 285" class="line"/>
+  <path d="M170 310 L802 285" class="line"/>
+  <path d="M170 325 L1050 285" class="line"/>
+
+  <path d="M170 755 L337 790" class="line"/>
+  <path d="M170 770 L582 790" class="line"/>
+  <path d="M170 785 L817 790" class="line"/>
+  <path d="M170 800 L1065 790" class="line"/>
+
+  <path d="M1370 260 L1058 285" class="line"/>
+  <path d="M1370 280 L1272 285" class="line"/>
+  <path d="M1370 300 L807 285" class="line"/>
+  <path d="M1370 320 L570 365" class="thin"/>
+
+  <path d="M1370 575 L1175 365" class="line"/>
+  <path d="M1370 585 L830 365" class="line"/>
+  <path d="M1370 595 L580 525" class="thin"/>
+  <path d="M1370 605 L831 525" class="thin"/>
+
+  <path d="M1370 790 L1275 790" class="line"/>
+  <path d="M1370 805 L1073 790" class="line"/>
+  <path d="M1370 820 L1095 625" class="thin"/>
+  <path d="M1370 835 L835 625" class="thin"/>
+  <path d="M1370 850 L593 625" class="thin"/>
+
+  <!-- Include / dependency lines -->
+  <path d="M930 327 L830 344" class="include"/>
+  <text x="858" y="328" class="include-label">&lt;&lt;include&gt;&gt;</text>
+
+  <path d="M820 333 L930 327" class="include"/>
+  <text x="850" y="318" class="include-label">&lt;&lt;include&gt;&gt;</text>
+
+  <path d="M820 397 L455 483" class="include"/>
+  <path d="M820 397 L705 483" class="include"/>
+  <path d="M820 397 L965 483" class="include"/>
+  <path d="M820 397 L455 583" class="include"/>
+  <path d="M820 397 L705 583" class="include"/>
+  <path d="M820 397 L965 583" class="include"/>
+  <text x="787" y="442" class="include-label">&lt;&lt;call tool if needed&gt;&gt;</text>
+
+  <path d="M1160 327 L1070 344" class="include"/>
+  <text x="1092" y="331" class="include-label">&lt;&lt;include&gt;&gt;</text>
+
+  <path d="M965 567 L1170 748" class="include"/>
+  <text x="1035" y="690" class="include-label">&lt;&lt;sync&gt;&gt;</text>
+
+  <path d="M455 667 L945 748" class="include"/>
+  <path d="M705 667 L945 748" class="include"/>
+  <path d="M965 667 L945 748" class="include"/>
+
+  <path d="M820 397 L1190 533" class="include"/>
+  <text x="1078" y="478" class="include-label">&lt;&lt;record&gt;&gt;</text>
+
+  <!-- Notes -->
+  <rect x="80" y="910" width="1440" height="54" class="note"/>
+  <text x="105" y="933" class="small">
+    Reading guide:
+  </text>
+  <text x="220" y="933" class="small">
+    Voice is the primary interaction for smart actions; web/mobile manages personal data and status.
+  </text>
+  <text x="220" y="953" class="small">
+    Supporting actors provide device I/O, persistent data, and external AI/media capabilities.
+  </text>
+</svg>

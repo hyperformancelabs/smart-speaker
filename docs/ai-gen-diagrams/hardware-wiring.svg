@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">Hardware Wiring and Physical Layer</title>
+  <desc id="desc">Physical wiring map for the ESP32 smart speaker, showing OLED I2C, RC522 SPI, INMP441 I2S microphone, MAX98357A I2S amplifier, speaker output, and power notes.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#202020"/>
+    </marker>
+    <style>
+      .title { font: 700 48px Arial, sans-serif; fill: #111; }
+      .subtitle { font: 400 18px Arial, sans-serif; fill: #333; }
+      .box { fill: #fff; stroke: #202020; stroke-width: 3; }
+      .soft { fill: #fafafa; stroke: #666; stroke-width: 2; }
+      .label { font: 700 28px Arial, sans-serif; fill: #111; }
+      .text { font: 400 17px Arial, sans-serif; fill: #222; }
+      .small { font: 400 15px Arial, sans-serif; fill: #333; }
+      .mono { font: 400 16px "Courier New", monospace; fill: #222; }
+      .bus { stroke: #202020; stroke-width: 3; fill: none; marker-end: url(#arrow); }
+      .bus2 { stroke: #202020; stroke-width: 3; fill: none; marker-start: url(#arrow); marker-end: url(#arrow); }
+      .thin { stroke: #666; stroke-width: 2; fill: none; }
+      .note { font: 700 16px Arial, sans-serif; fill: #111; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="900" fill="#fff"/>
+
+  <text x="80" y="70" class="title">Hardware Wiring / Physical Layer</text>
+  <text x="80" y="104" class="subtitle">ESP32 DOIT DevKit V1 connected to microphone, speaker amplifier, NFC reader, OLED display, and shared power rails.</text>
+
+  <!-- ESP32 center -->
+  <rect x="555" y="150" width="490" height="600" rx="18" class="box"/>
+  <text x="800" y="205" text-anchor="middle" class="label">ESP32 DOIT DevKit V1</text>
+  <text x="800" y="232" text-anchor="middle" class="small">Main controller: audio I/O, Wi-Fi, NFC events, OLED UI</text>
+
+  <rect x="610" y="270" width="380" height="72" rx="10" class="soft"/>
+  <text x="640" y="296" class="note">I2C Display Bus</text>
+  <text x="640" y="322" class="mono">GPIO21 SDA  |  GPIO22 SCL</text>
+
+  <rect x="610" y="375" width="380" height="100" rx="10" class="soft"/>
+  <text x="640" y="401" class="note">SPI NFC Bus</text>
+  <text x="640" y="427" class="mono">GPIO16 SS   |  GPIO17 RST</text>
+  <text x="640" y="452" class="mono">GPIO18 SCK  |  GPIO19 MISO  |  GPIO23 MOSI</text>
+
+  <rect x="610" y="505" width="380" height="92" rx="10" class="soft"/>
+  <text x="640" y="531" class="note">I2S RX: Microphone</text>
+  <text x="640" y="557" class="mono">GPIO26 BCLK |  GPIO27 WS</text>
+  <text x="640" y="582" class="mono">GPIO32 SD   |  RIGHT channel</text>
+
+  <rect x="610" y="625" width="380" height="92" rx="10" class="soft"/>
+  <text x="640" y="651" class="note">I2S TX: Speaker Amplifier</text>
+  <text x="640" y="677" class="mono">GPIO25 DIN  |  GPIO26 BCLK  |  GPIO27 LRC</text>
+  <text x="640" y="702" class="mono">GPIO13 SD enable</text>
+
+  <!-- Left side: NFC and power -->
+  <rect x="90" y="340" width="340" height="178" rx="14" class="box"/>
+  <text x="260" y="385" text-anchor="middle" class="label">RC522 NFC Reader</text>
+  <text x="130" y="425" class="text">Protocol: SPI</text>
+  <text x="130" y="455" class="text">Power: 3.3V only</text>
+  <text x="130" y="485" class="text">Purpose: NFC identity card</text>
+
+  <rect x="90" y="590" width="340" height="160" rx="14" class="box"/>
+  <text x="260" y="633" text-anchor="middle" class="label">Power Rules</text>
+  <text x="130" y="672" class="text">3.3V: OLED, INMP441, RC522</text>
+  <text x="130" y="702" class="text">5V VIN: MAX98357A amplifier</text>
+  <text x="130" y="732" class="text">Common GND, star topology</text>
+
+  <!-- Right side modules -->
+  <rect x="1170" y="250" width="340" height="140" rx="14" class="box"/>
+  <text x="1340" y="293" text-anchor="middle" class="label">OLED SSD1306</text>
+  <text x="1210" y="333" class="text">Protocol: I2C</text>
+  <text x="1210" y="363" class="text">Role: device state display</text>
+
+  <rect x="1170" y="455" width="340" height="160" rx="14" class="box"/>
+  <text x="1340" y="498" text-anchor="middle" class="label">INMP441 Microphone</text>
+  <text x="1210" y="538" class="text">Protocol: I2S RX</text>
+  <text x="1210" y="568" class="text">Sample rate: 16 kHz mono</text>
+  <text x="1210" y="598" class="text">Keep I2S wires short</text>
+
+  <rect x="1170" y="665" width="340" height="142" rx="14" class="box"/>
+  <text x="1340" y="708" text-anchor="middle" class="label">MAX98357A + Speaker</text>
+  <text x="1210" y="748" class="text">Protocol: I2S TX</text>
+  <text x="1210" y="778" class="text">Speaker connects to SPK+ / SPK-</text>
+
+  <!-- Bus arrows -->
+  <path d="M990 306 L1170 306" class="bus"/>
+  <text x="1080" y="286" text-anchor="middle" class="small">I2C SDA/SCL</text>
+
+  <path d="M430 428 L610 428" class="bus"/>
+  <text x="520" y="405" text-anchor="middle" class="small">SPI SS/RST/SCK/MISO/MOSI</text>
+
+  <path d="M990 550 L1170 550" class="bus2"/>
+  <text x="1080" y="528" text-anchor="middle" class="small">I2S RX audio</text>
+
+  <path d="M990 672 L1170 736" class="bus"/>
+  <text x="1095" y="690" text-anchor="middle" class="small">I2S TX playback</text>
+
+  <!-- Shared clock note -->
+  <path d="M800 597 L800 625" class="thin"/>
+  <text x="1035" y="616" class="small">GPIO26 BCLK and GPIO27 LRCLK are shared by microphone and amplifier.</text>
+  <text x="1035" y="640" class="small">Firmware switches the shared I2S route between capture and playback.</text>
+
+  <!-- Bottom explanation strip -->
+  <rect x="80" y="820" width="1440" height="50" rx="10" fill="#fafafa" stroke="#777" stroke-width="1.5"/>
+  <text x="105" y="852" class="text">Reading guide:</text>
+  <text x="250" y="852" class="small">NFC identifies the user, INMP441 captures speech, ESP32 streams audio over Wi-Fi, backend returns TTS/media, and MAX98357A drives the speaker.</text>
+</svg>

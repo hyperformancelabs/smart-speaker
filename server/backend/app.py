@@ -13,6 +13,7 @@ import requests
 from assistant_service import clear_assistant_session, resolve_session_key, run_assistant_turn
 from asset_registry import asset_registry
 from config import (
+    DISABLE_TTS,
     BACKEND_API_URL,
     FFMPEG_BIN,
     LOG_FILE_PATH,
@@ -577,25 +578,28 @@ def stop_audio_capture():
 
 
 def main() -> None:
-    prewarm_started_at = time.monotonic()
-    try:
-        tts_service.prewarm()
-        log_kv(
-            logger,
-            logging.INFO,
-            "tts_prewarm_completed",
-            voice_name=tts_service.voice_name,
-            elapsed_ms=round((time.monotonic() - prewarm_started_at) * 1000),
-        )
-    except Exception as exc:
-        logger.exception("tts_prewarm_failed")
-        log_kv(
-            logger,
-            logging.WARNING,
-            "tts_prewarm_failed",
-            error=str(exc),
-            elapsed_ms=round((time.monotonic() - prewarm_started_at) * 1000),
-        )
+    if not DISABLE_TTS:
+        prewarm_started_at = time.monotonic()
+        try:
+            tts_service.prewarm()
+            log_kv(
+                logger,
+                logging.INFO,
+                "tts_prewarm_completed",
+                voice_name=tts_service.voice_name,
+                elapsed_ms=round((time.monotonic() - prewarm_started_at) * 1000),
+            )
+        except Exception as exc:
+            logger.exception("tts_prewarm_failed")
+            log_kv(
+                logger,
+                logging.WARNING,
+                "tts_prewarm_failed",
+                error=str(exc),
+                elapsed_ms=round((time.monotonic() - prewarm_started_at) * 1000),
+            )
+    else:
+        log_kv(logger, logging.INFO, "tts_prewarm_skipped", reason="DISABLE_TTS")
 
     log_kv(
         logger,

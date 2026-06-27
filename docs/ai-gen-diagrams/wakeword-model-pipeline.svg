@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">Wakeword Data and Model Pipeline</title>
+  <desc id="desc">Wakeword data and model pipeline showing source datasets, augmentation, balanced dataset generation, Edge Impulse MFCC and quantized TFLite model, and ESP32 runtime detection.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#202020"/>
+    </marker>
+    <style>
+      .title { font: 700 48px Arial, sans-serif; fill: #111; }
+      .subtitle { font: 400 18px Arial, sans-serif; fill: #333; }
+      .zone { fill: #fafafa; stroke: #444; stroke-width: 2; }
+      .box { fill: #fff; stroke: #202020; stroke-width: 3; }
+      .soft { fill: #fff; stroke: #777; stroke-width: 2; }
+      .label { font: 700 24px Arial, sans-serif; fill: #111; }
+      .zoneLabel { font: 700 26px Arial, sans-serif; fill: #111; }
+      .text { font: 400 16px Arial, sans-serif; fill: #222; }
+      .small { font: 400 14px Arial, sans-serif; fill: #333; }
+      .mono { font: 400 15px "Courier New", monospace; fill: #222; }
+      .line { stroke: #202020; stroke-width: 3; fill: none; marker-end: url(#arrow); }
+      .thin { stroke: #666; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect width="1600" height="900" fill="#fff"/>
+
+  <text x="80" y="70" class="title">Wakeword Data + Model Pipeline</text>
+  <text x="80" y="104" class="subtitle">A conservative edge wake-word detector: train with balanced positive/negative/noise data, deploy an Edge Impulse model, and trigger locally on ESP32.</text>
+
+  <!-- Zones -->
+  <rect x="70" y="145" width="475" height="570" rx="18" class="zone"/>
+  <text x="308" y="188" text-anchor="middle" class="zoneLabel">1. Dataset Building</text>
+
+  <rect x="585" y="145" width="430" height="570" rx="18" class="zone"/>
+  <text x="800" y="188" text-anchor="middle" class="zoneLabel">2. Edge Impulse Model</text>
+
+  <rect x="1055" y="145" width="475" height="570" rx="18" class="zone"/>
+  <text x="1292" y="188" text-anchor="middle" class="zoneLabel">3. ESP32 Runtime</text>
+
+  <!-- Dataset source boxes -->
+  <rect x="105" y="225" width="185" height="105" rx="12" class="box"/>
+  <text x="197" y="260" text-anchor="middle" class="label">Wakeup</text>
+  <text x="130" y="292" class="small">Positive clips</text>
+  <text x="130" y="315" class="small">Target wake word</text>
+
+  <rect x="325" y="225" width="185" height="105" rx="12" class="box"/>
+  <text x="417" y="260" text-anchor="middle" class="label">Unknown</text>
+  <text x="350" y="292" class="small">Speech commands</text>
+  <text x="350" y="315" class="small">Non-target words</text>
+
+  <rect x="105" y="365" width="185" height="105" rx="12" class="box"/>
+  <text x="197" y="400" text-anchor="middle" class="label">Noise</text>
+  <text x="130" y="432" class="small">WHAM + ESC-50</text>
+  <text x="130" y="455" class="small">Background sounds</text>
+
+  <rect x="325" y="365" width="185" height="105" rx="12" class="box"/>
+  <text x="417" y="400" text-anchor="middle" class="label">My Noise</text>
+  <text x="350" y="432" class="small">Recorded from ESP32</text>
+  <text x="350" y="455" class="small">Real room/device noise</text>
+
+  <rect x="140" y="525" width="330" height="125" rx="12" class="box"/>
+  <text x="305" y="560" text-anchor="middle" class="label">Augmentation Notebook</text>
+  <text x="170" y="594" class="text">Resample every clip to 1s / 16kHz</text>
+  <text x="170" y="620" class="text">Random gain + SNR noise mixing</text>
+  <text x="170" y="646" class="text">Split-aware sampling, held-out OOD noise</text>
+
+  <!-- Dataset arrows -->
+  <path d="M198 330 L270 525" class="thin"/>
+  <path d="M418 330 L340 525" class="thin"/>
+  <path d="M198 470 L270 525" class="thin"/>
+  <path d="M418 470 L340 525" class="thin"/>
+
+  <!-- Model boxes -->
+  <rect x="625" y="225" width="350" height="105" rx="12" class="box"/>
+  <text x="800" y="260" text-anchor="middle" class="label">Balanced Dataset</text>
+  <text x="655" y="292" class="text">15,000 clips total</text>
+  <text x="655" y="317" class="text">25% wakeup / 50% unknown / 25% noise</text>
+
+  <rect x="625" y="380" width="350" height="105" rx="12" class="box"/>
+  <text x="800" y="415" text-anchor="middle" class="label">MFCC Feature Block</text>
+  <text x="655" y="448" class="text">Audio DSP on 16kHz waveform</text>
+  <text x="655" y="473" class="text">637 feature values for NN input</text>
+
+  <rect x="625" y="535" width="350" height="115" rx="12" class="box"/>
+  <text x="800" y="570" text-anchor="middle" class="label">Quantized TFLite Model</text>
+  <text x="655" y="603" class="text">3 labels: noise, other, wakeup</text>
+  <text x="655" y="628" class="text">Compiled Edge Impulse C++ library</text>
+
+  <path d="M470 588 L625 278" class="line"/>
+  <path d="M800 330 L800 380" class="line"/>
+  <path d="M800 485 L800 535" class="line"/>
+
+  <!-- Runtime boxes -->
+  <rect x="1095" y="225" width="395" height="100" rx="12" class="box"/>
+  <text x="1292" y="260" text-anchor="middle" class="label">I2S Microphone Capture</text>
+  <text x="1125" y="292" class="text">INMP441, 16kHz mono PCM</text>
+  <text x="1125" y="316" class="text">Audio chunks from RTOS audio task</text>
+
+  <rect x="1095" y="375" width="395" height="110" rx="12" class="box"/>
+  <text x="1292" y="410" text-anchor="middle" class="label">Continuous Inference</text>
+  <text x="1125" y="443" class="text">Slice buffer from live samples</text>
+  <text x="1125" y="468" class="mono">run_classifier_continuous()</text>
+
+  <rect x="1095" y="535" width="395" height="115" rx="12" class="box"/>
+  <text x="1292" y="570" text-anchor="middle" class="label">Trigger Policy</text>
+  <text x="1125" y="603" class="text">Wakeup score threshold: 0.60</text>
+  <text x="1125" y="628" class="text">Release: 0.35, cooldown: 1500ms</text>
+
+  <path d="M975 593 L1095 430" class="line"/>
+  <path d="M1292 325 L1292 375" class="line"/>
+  <path d="M1292 485 L1292 535" class="line"/>
+
+  <!-- Outcome -->
+  <rect x="1135" y="755" width="315" height="65" rx="12" class="box"/>
+  <text x="1292" y="795" text-anchor="middle" class="label">Wake Signal to Firmware</text>
+  <path d="M1292 650 L1292 755" class="line"/>
+
+  <!-- Key numbers -->
+  <rect x="70" y="755" width="930" height="95" rx="12" fill="#fafafa" stroke="#777" stroke-width="1.5"/>
+  <text x="100" y="788" class="label">Key Numbers</text>
+  <text x="100" y="822" class="text">Input window: 1 second = 16,000 samples at 16kHz</text>
+  <text x="505" y="822" class="text">Train / val / test: 9,600 / 2,400 / 3,000 clips</text>
+  <text x="100" y="847" class="text">Model project: Edge Impulse “wakeup”, deploy version 19, TFLite int8 quantized</text>
+</svg>

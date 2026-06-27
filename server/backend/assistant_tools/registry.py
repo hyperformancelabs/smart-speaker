@@ -13,6 +13,8 @@ from assistant_tools.backend_tools import (
     delete_alarm,
     get_lists,
     get_memory,
+    reset_memory,
+    reset_preferences,
     get_user_profile,
     list_alarms,
     list_items,
@@ -57,6 +59,8 @@ TOOL_FUNCTIONS = {
     "save_memory": save_memory,
     "delete_memory": delete_memory,
     "get_memory": get_memory,
+    "reset_memory": reset_memory,
+    "reset_preferences": reset_preferences,
 }
 
 

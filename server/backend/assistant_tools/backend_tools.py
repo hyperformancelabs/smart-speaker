@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from assistant_tools.common import backend_json, backend_request, parse_json_string_if_possible
+from profile_schema import build_default_preferences
 
 
 def _normalize_lookup_value(value: Any) -> str:
@@ -951,6 +952,45 @@ def get_memory(nfc_tag_id: str) -> dict[str, Any]:
         return {"status": "success", "memories": data.get("memory", [])}
     except Exception as exc:
         return {"status": "error", "message": f"Failed to get memory: {str(exc)}"}
+
+
+def reset_memory(nfc_tag_id: str) -> dict[str, Any]:
+    try:
+        data = backend_json("PATCH", f"/api/users/{nfc_tag_id}/update", json_payload={"field": "memory", "value": []})
+        return {
+            "status": "success",
+            "message": "Memory reset to default.",
+            "memories": data.get("memory", []),
+            "device_payload": {
+                "type": "memory",
+                "action": "reset",
+                "status": "ok",
+            },
+        }
+    except Exception as exc:
+        return {"status": "error", "message": f"Failed to reset memory: {str(exc)}"}
+
+
+def reset_preferences(nfc_tag_id: str) -> dict[str, Any]:
+    try:
+        default_preferences = build_default_preferences()
+        data = backend_json(
+            "PATCH",
+            f"/api/users/{nfc_tag_id}/update",
+            json_payload={"field": "preferences", "value": default_preferences},
+        )
+        return {
+            "status": "success",
+            "message": "Preferences reset to default.",
+            "preferences": data.get("preferences", default_preferences),
+            "device_payload": {
+                "type": "preferences",
+                "action": "reset",
+                "status": "ok",
+            },
+        }
+    except Exception as exc:
+        return {"status": "error", "message": f"Failed to reset preferences: {str(exc)}"}
 
 
 def list_media_history(nfc_tag_id: str) -> dict[str, Any]:

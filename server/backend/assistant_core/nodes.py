@@ -1120,6 +1120,10 @@ def _looks_like_explicit_memory_statement(user_input: str) -> bool:
     return bool(_extract_explicit_memory_statement(user_input))
 
 
+def _looks_like_personal_data_reset_request(user_input: str) -> bool:
+    return _extract_personal_data_reset_request(user_input) is not None
+
+
 def _derive_return_mode(session_state: dict[str, Any], route_group: str) -> str:
     del session_state
     del route_group
@@ -1137,6 +1141,12 @@ def _heuristic_route_group(session_state: dict[str, Any], user_input: str) -> di
         }
 
     if _looks_like_context_reset_request(user_input):
+        if _looks_like_personal_data_reset_request(user_input):
+            return {
+                "group": "personalization",
+                "confidence": 0.99,
+                "reason": "explicit_personal_data_reset",
+            }
         return {
             "group": "conversation",
             "confidence": 0.99,

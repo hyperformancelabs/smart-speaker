@@ -36,7 +36,7 @@ constexpr unsigned long STARTUP_SPINNER_INTERVAL_MS = 120;
 
 constexpr int MIC_SAMPLE_RATE = 16000;
 constexpr int MIC_DMA_LEN = 512;
-constexpr int MIC_DMA_CNT = 8;
+constexpr int MIC_DMA_CNT = 4;
 constexpr int FRAME_SAMPLES = 320;
 
 constexpr int SPK_SAMPLE_RATE = 16000;

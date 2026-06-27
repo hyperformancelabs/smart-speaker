@@ -153,6 +153,12 @@ button {
 .btn-icon:hover {
   background: var(--bg-panel-hover);
 }
+.btn-icon.text-danger {
+  color: var(--danger);
+}
+.btn-icon.text-danger:hover {
+  background: rgba(230, 57, 70, 0.12);
+}
 
 /* --- AUTHENTICATION LAYOUT --- */
 .auth-layout {
@@ -237,7 +243,7 @@ button {
   border-radius: var(--radius-sm);
   color: var(--text-main);
   font-family: var(--font-main);
-  font-size: 1rem;
+  font-size: 16px;
   transition: var(--transition);
 }
 .form-group input:focus {
@@ -329,6 +335,15 @@ button {
   width: 100%;
   justify-content: flex-start;
 }
+.sidebar-footer .btn-ghost.text-danger {
+  background: rgba(220, 53, 69, 0.08);
+  border: 1px solid rgba(220, 53, 69, 0.18);
+  color: var(--danger);
+}
+.sidebar-footer .btn-ghost.text-danger:hover {
+  background: rgba(220, 53, 69, 0.14);
+  border-color: rgba(220, 53, 69, 0.28);
+}
 
 /* MAIN CONTENT */
 .main-content {
@@ -406,6 +421,17 @@ button {
 
 .alarm-actions { display: flex; align-items: center; gap: 1rem; }
 
+.view-only-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--border-glass);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
 /* Toggle Switch Styling */
 .toggle-switch {
   position: relative;
@@ -458,12 +484,16 @@ input:checked + .slider:before {
 /* --- TOAST & UI COMPONENTS --- */
 .toast-container {
   position: fixed;
-  top: 20px;
-  right: 20px;
+  top: calc(16px + env(safe-area-inset-top, 0px));
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
   z-index: 9999;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  width: min(92vw, 420px);
+  pointer-events: none;
 }
 
 .toast {
@@ -475,8 +505,9 @@ input:checked + .slider:before {
   display: flex;
   align-items: center;
   gap: 12px;
-  min-width: 250px;
+  width: 100%;
   animation: slideInRight 0.3s ease forwards;
+  pointer-events: auto;
 }
 .toast.toast-success { border-color: var(--success); }
 .toast.toast-error { border-color: var(--danger); }
@@ -563,6 +594,11 @@ input:checked + .slider:before {
     padding: 0.8rem 1rem;
     z-index: 50;
   }
+  .mobile-header .btn-icon.text-danger {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+  }
 
   .sidebar { 
     position: fixed; 
@@ -616,12 +652,12 @@ input:checked + .slider:before {
 }
 
 @media (max-width: 480px) {
-  .form-group input { padding: 0.8rem 1rem; font-size: 0.9rem; }
+  .form-group input { padding: 0.8rem 1rem; font-size: 16px; }
   .alarm-card { flex-direction: column; align-items: flex-start; gap: 1rem; }
   .alarm-actions { width: 100%; justify-content: space-between; }
   .view-header > div { flex-direction: column; }
   .view-header > div > button, .view-header input { width: 100% !important; }
-  .toast-container { left: 10px; right: 10px; top: 10px; }
+  .toast-container { width: calc(100vw - 20px); }
   .toast { min-width: 0; width: 100%; box-sizing: border-box; }
 }
 

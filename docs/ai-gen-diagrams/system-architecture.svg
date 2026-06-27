@@ -1,0 +1,163 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">Overall System Architecture</title>
+  <desc id="desc">High-level architecture of the context-aware smart speaker with NFC personalization, ESP32 edge device, voice backend, database API, web/mobile UI, and external AI/media services.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#222"/>
+    </marker>
+    <marker id="arrow-light" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#555"/>
+    </marker>
+    <style>
+      .bg { fill: #ffffff; }
+      .title { font: 700 34px Arial, Helvetica, sans-serif; fill: #111; }
+      .subtitle { font: 400 17px Arial, Helvetica, sans-serif; fill: #444; }
+      .box { fill: #fff; stroke: #222; stroke-width: 2; rx: 14; }
+      .group { fill: #fafafa; stroke: #222; stroke-width: 2.5; rx: 18; }
+      .label { font: 700 22px Arial, Helvetica, sans-serif; fill: #111; }
+      .small { font: 400 16px Arial, Helvetica, sans-serif; fill: #222; }
+      .tiny { font: 400 14px Arial, Helvetica, sans-serif; fill: #333; }
+      .mono { font: 400 14px Menlo, Consolas, monospace; fill: #333; }
+      .arrow { stroke: #222; stroke-width: 2.4; fill: none; marker-end: url(#arrow); }
+      .arrow2 { stroke: #555; stroke-width: 2; fill: none; marker-end: url(#arrow-light); }
+      .dash { stroke-dasharray: 7 6; }
+      .note { fill: #f7f7f7; stroke: #777; stroke-width: 1.5; rx: 10; }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1600" height="900"/>
+  <text class="title" x="80" y="64">Overall System Architecture</text>
+  <text class="subtitle" x="80" y="94">Context-aware smart speaker with edge wake word, NFC personalization, backend AI orchestration, database management, and web/mobile UI.</text>
+
+  <!-- User and UI layer -->
+  <rect class="group" x="70" y="145" width="280" height="600"/>
+  <text class="label" x="105" y="185">User / UI Layer</text>
+
+  <rect class="box" x="105" y="220" width="210" height="105"/>
+  <text class="small" x="135" y="255">End User</text>
+  <text class="tiny" x="135" y="282">Voice commands</text>
+  <text class="tiny" x="135" y="305">NFC identity card</text>
+
+  <rect class="box" x="105" y="370" width="210" height="120"/>
+  <text class="small" x="135" y="405">Web Dashboard</text>
+  <text class="tiny" x="135" y="432">Login / profile</text>
+  <text class="tiny" x="135" y="455">Alarms, timers, lists</text>
+  <text class="tiny" x="135" y="478">Media history</text>
+
+  <rect class="box" x="105" y="535" width="210" height="120"/>
+  <text class="small" x="135" y="570">Mobile App</text>
+  <text class="tiny" x="135" y="597">Overview</text>
+  <text class="tiny" x="135" y="620">View alarms / timers</text>
+  <text class="tiny" x="135" y="643">Lists and profile</text>
+
+  <!-- ESP32 layer -->
+  <rect class="group" x="430" y="145" width="320" height="600"/>
+  <text class="label" x="475" y="185">ESP32 Edge Device</text>
+
+  <rect class="box" x="470" y="220" width="240" height="145"/>
+  <text class="small" x="500" y="255">Physical Modules</text>
+  <text class="tiny" x="500" y="282">INMP441 microphone</text>
+  <text class="tiny" x="500" y="305">MAX98357A speaker amp</text>
+  <text class="tiny" x="500" y="328">RC522 NFC reader</text>
+  <text class="tiny" x="500" y="351">OLED display</text>
+
+  <rect class="box" x="470" y="405" width="240" height="185"/>
+  <text class="small" x="500" y="440">Firmware Runtime</text>
+  <text class="tiny" x="500" y="467">Edge wake-word model</text>
+  <text class="tiny" x="500" y="490">Audio capture + packetize</text>
+  <text class="tiny" x="500" y="513">WebSocket / HTTP client</text>
+  <text class="tiny" x="500" y="536">OLED state rendering</text>
+  <text class="tiny" x="500" y="559">TTS / media playback</text>
+
+  <rect class="note" x="470" y="630" width="240" height="78"/>
+  <text class="mono" x="500" y="660">PCM: 16 kHz mono</text>
+  <text class="mono" x="500" y="684">320 samples / packet</text>
+
+  <!-- Backend layer -->
+  <rect class="group" x="825" y="145" width="360" height="600"/>
+  <text class="label" x="885" y="185">Voice Backend Server</text>
+
+  <rect class="box" x="865" y="220" width="280" height="150"/>
+  <text class="small" x="895" y="255">Audio Capture Service</text>
+  <text class="tiny" x="895" y="282">POST /api/audio/start</text>
+  <text class="tiny" x="895" y="305">Connects to ESP WebSocket</text>
+  <text class="tiny" x="895" y="328">Receives PCM packets</text>
+  <text class="tiny" x="895" y="351">Silero VAD / end-of-speech</text>
+
+  <rect class="box" x="865" y="405" width="280" height="168"/>
+  <text class="small" x="895" y="440">AI Voice Pipeline</text>
+  <text class="tiny" x="895" y="467">Groq Whisper STT</text>
+  <text class="tiny" x="895" y="490">Single-turn ReAct agent</text>
+  <text class="tiny" x="895" y="513">Tool calling</text>
+  <text class="tiny" x="895" y="536">TTS generation</text>
+  <text class="tiny" x="895" y="559">Media proxy / WAV transcode</text>
+
+  <rect class="note" x="865" y="615" width="280" height="93"/>
+  <text class="mono" x="895" y="645">Output to ESP</text>
+  <text class="mono" x="895" y="669">control JSON + TTS URL</text>
+  <text class="mono" x="895" y="693">optional media URL</text>
+
+  <!-- Database/API layer -->
+  <rect class="group" x="1260" y="145" width="280" height="300"/>
+  <text class="label" x="1302" y="185">Database API</text>
+
+  <rect class="box" x="1295" y="220" width="210" height="180"/>
+  <text class="small" x="1325" y="255">PostgreSQL Data</text>
+  <text class="tiny" x="1325" y="282">Users + NFC profile</text>
+  <text class="tiny" x="1325" y="305">Memory + preferences</text>
+  <text class="tiny" x="1325" y="328">Alarms + timers</text>
+  <text class="tiny" x="1325" y="351">Lists + list items</text>
+  <text class="tiny" x="1325" y="374">Media history + logs</text>
+
+  <!-- External services -->
+  <rect class="group" x="1260" y="500" width="280" height="245"/>
+  <text class="label" x="1300" y="540">External Services</text>
+
+  <rect class="box" x="1295" y="575" width="210" height="125"/>
+  <text class="tiny" x="1325" y="610">OpenRouter LLM</text>
+  <text class="tiny" x="1325" y="633">Groq Whisper STT</text>
+  <text class="tiny" x="1325" y="656">TTS provider</text>
+  <text class="tiny" x="1325" y="679">YouTube / web search</text>
+
+  <!-- Main arrows -->
+  <path class="arrow" d="M 315 272 C 365 272, 390 272, 430 272"/>
+  <text class="tiny" x="350" y="255">voice + NFC</text>
+
+  <path class="arrow" d="M 430 620 C 390 620, 365 620, 315 620"/>
+  <text class="tiny" x="338" y="646">speech + display</text>
+
+  <path class="arrow" d="M 750 290 C 790 290, 790 290, 825 290"/>
+  <text class="tiny" x="760" y="270">HTTP start</text>
+  <text class="tiny" x="760" y="292">WS audio packets</text>
+
+  <path class="arrow" d="M 825 660 C 790 660, 790 660, 750 660"/>
+  <text class="tiny" x="760" y="635">control JSON</text>
+  <text class="tiny" x="760" y="657">TTS / media URL</text>
+
+  <path class="arrow2" d="M 1145 300 L 1260 300"/>
+  <text class="tiny" x="1174" y="282">profile, tools, logs</text>
+
+  <path class="arrow2" d="M 1260 365 L 1145 365"/>
+  <text class="tiny" x="1177" y="390">records / context</text>
+
+  <path class="arrow2 dash" d="M 1450 445 C 1450 470, 1450 475, 1450 500"/>
+  <text class="tiny" x="1465" y="475">schedule notify</text>
+
+  <path class="arrow2" d="M 710 505 C 760 505, 810 505, 865 505"/>
+  <text class="tiny" x="746" y="529">capture state</text>
+
+  <path class="arrow2" d="M 315 430 L 370 430 L 370 120 L 1400 120 L 1400 145"/>
+  <text class="tiny" x="610" y="128">web/mobile REST API</text>
+
+  <path class="arrow2 dash" d="M 710 675 L 780 675 L 780 770 L 1555 770 L 1555 295 L 1540 295"/>
+  <text class="tiny" x="870" y="792">device profile-status + schedule sync/events</text>
+
+  <path class="arrow2" d="M 1145 510 L 1225 510 L 1225 625 L 1260 625"/>
+  <text class="tiny" x="1160" y="532">LLM / STT / TTS</text>
+  <text class="tiny" x="1160" y="554">media / search</text>
+
+  <!-- Footer note -->
+  <rect class="note" x="80" y="800" width="1460" height="55"/>
+  <text class="small" x="105" y="833">Reading guide:</text>
+  <text class="tiny" x="250" y="833">ESP32 handles wake word and realtime audio on edge; backend handles STT, AI orchestration, TTS/media; database API stores user data; web/mobile manage personal data and status.</text>
+</svg>

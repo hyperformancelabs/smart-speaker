@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">Backend AI Orchestration</title>
+  <desc id="desc">Backend pipeline from audio stream to speech transcript, single-turn ReAct agent, tool calls, and ESP response contract.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#111"/>
+    </marker>
+    <marker id="arrow-light" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#555"/>
+    </marker>
+    <style>
+      .bg { fill: #fff; }
+      .title { font: 700 50px Arial, Helvetica, sans-serif; fill: #111; }
+      .subtitle { font: 400 18px Arial, Helvetica, sans-serif; fill: #444; }
+      .box { fill: #fff; stroke: #111; stroke-width: 2.7; rx: 12; }
+      .small-box { fill: #fff; stroke: #111; stroke-width: 2.3; rx: 9; }
+      .agent { fill: #fafafa; stroke: #111; stroke-width: 3; rx: 15; }
+      .box-title { font: 700 30px Arial, Helvetica, sans-serif; fill: #111; }
+      .label { font: 400 22px Arial, Helvetica, sans-serif; fill: #111; }
+      .small { font: 400 17px Arial, Helvetica, sans-serif; fill: #222; }
+      .group { font: 700 28px Arial, Helvetica, sans-serif; fill: #111; }
+      .line { stroke: #111; stroke-width: 3; fill: none; marker-end: url(#arrow); }
+      .line2 { stroke: #555; stroke-width: 2.4; fill: none; marker-end: url(#arrow-light); }
+      .bus { stroke: #111; stroke-width: 3; fill: none; }
+      .dash { stroke-dasharray: 7 6; }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1600" height="900"/>
+  <text x="800" y="70" text-anchor="middle" class="title">Backend / AI Orchestration</text>
+  <text x="800" y="103" text-anchor="middle" class="subtitle">Single-turn voice pipeline: VAD + STT prepares the transcript, the ReAct agent decides, tools execute, then backend returns a compact ESP response contract.</text>
+
+  <!-- Input preparation -->
+  <rect x="70" y="165" width="250" height="86" class="box"/>
+  <text x="195" y="218" text-anchor="middle" class="box-title">Audio Stream</text>
+
+  <rect x="70" y="320" width="250" height="96" class="box"/>
+  <text x="195" y="358" text-anchor="middle" class="box-title">VAD + Speech</text>
+  <text x="195" y="394" text-anchor="middle" class="box-title">Segment</text>
+
+  <rect x="70" y="485" width="250" height="86" class="box"/>
+  <text x="195" y="538" text-anchor="middle" class="box-title">STT Transcript</text>
+
+  <path d="M195 251 L195 320" class="line"/>
+  <path d="M195 416 L195 485" class="line"/>
+
+  <!-- Agent core -->
+  <rect x="510" y="205" width="570" height="345" class="agent"/>
+  <text x="795" y="315" text-anchor="middle" class="box-title">Single-turn ReAct Agent</text>
+
+  <rect x="565" y="385" width="125" height="72" class="small-box"/>
+  <text x="627.5" y="430" text-anchor="middle" class="label">Reason</text>
+
+  <rect x="750" y="385" width="125" height="72" class="small-box"/>
+  <text x="812.5" y="430" text-anchor="middle" class="label">Decide</text>
+
+  <rect x="935" y="385" width="125" height="72" class="small-box"/>
+  <text x="997.5" y="430" text-anchor="middle" class="label">Respond</text>
+
+  <path d="M690 421 L750 421" class="line"/>
+  <path d="M875 421 L935 421" class="line"/>
+
+  <path d="M320 528 L420 528 L420 421 L510 421" class="line"/>
+  <text x="346" y="508" class="small">transcript</text>
+
+  <!-- Tools -->
+  <text x="1365" y="136" text-anchor="middle" class="group">Available Tools</text>
+
+  <rect x="1245" y="165" width="260" height="72" class="box"/>
+  <text x="1375" y="211" text-anchor="middle" class="box-title">Media</text>
+
+  <rect x="1245" y="265" width="260" height="72" class="box"/>
+  <text x="1375" y="311" text-anchor="middle" class="box-title">Alarm / Timer</text>
+
+  <rect x="1245" y="365" width="260" height="72" class="box"/>
+  <text x="1375" y="411" text-anchor="middle" class="box-title">Lists / Notes</text>
+
+  <rect x="1245" y="465" width="260" height="72" class="box"/>
+  <text x="1375" y="511" text-anchor="middle" class="box-title">Memory / Profile</text>
+
+  <rect x="1245" y="565" width="260" height="72" class="box"/>
+  <text x="1375" y="611" text-anchor="middle" class="box-title">Web Info</text>
+
+  <!-- Tool request bus: agent fans out into every available tool. -->
+  <path d="M1080 350 L1180 350" class="line2"/>
+  <path d="M1180 201 L1180 601" class="bus"/>
+  <path d="M1180 201 L1245 201" class="line2"/>
+  <path d="M1180 301 L1245 301" class="line2"/>
+  <path d="M1180 401 L1245 401" class="line2"/>
+  <path d="M1180 501 L1245 501" class="line2"/>
+  <path d="M1180 601 L1245 601" class="line2"/>
+  <text x="1104" y="332" class="small">tool request</text>
+
+  <!-- Tool result lane: tool outputs return directly to the agent. -->
+  <path d="M1215 500 L1080 500" class="line2"/>
+  <text x="1104" y="528" class="small">tool result</text>
+
+  <!-- Output contract -->
+  <path d="M795 550 L795 680" class="line"/>
+  <text x="820" y="602" class="small">final response</text>
+
+  <path d="M245 680 L1355 680" class="bus"/>
+  <path d="M430 680 L430 730" class="line"/>
+  <path d="M675 680 L675 730" class="line"/>
+  <path d="M930 680 L930 730" class="line"/>
+  <path d="M1185 680 L1185 730" class="line"/>
+
+  <rect x="285" y="730" width="290" height="82" class="box"/>
+  <text x="430" y="781" text-anchor="middle" class="box-title">Response Text</text>
+
+  <rect x="590" y="730" width="170" height="82" class="box"/>
+  <text x="675" y="768" text-anchor="middle" class="box-title">TTS Audio</text>
+  <text x="675" y="800" text-anchor="middle" class="box-title">URL</text>
+
+  <rect x="785" y="730" width="290" height="82" class="box"/>
+  <text x="930" y="768" text-anchor="middle" class="box-title">ESP Command</text>
+  <text x="930" y="800" text-anchor="middle" class="box-title">JSON</text>
+
+  <rect x="1095" y="730" width="180" height="82" class="box"/>
+  <text x="1185" y="768" text-anchor="middle" class="box-title">ESP</text>
+  <text x="1185" y="800" text-anchor="middle" class="box-title">Playback</text>
+</svg>

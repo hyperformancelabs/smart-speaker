@@ -12,11 +12,38 @@ import {
   TimerAPI,
 } from "../services/api.js";
 
+const DASHBOARD_LAST_VIEW_KEY = "dashboardLastView";
+
 function clearSession() {
   localStorage.removeItem("userId");
   localStorage.removeItem("nfcTagId");
   localStorage.removeItem("userName");
   localStorage.removeItem("displayName");
+  localStorage.removeItem(DASHBOARD_LAST_VIEW_KEY);
+}
+
+function setActiveMenu(menuId) {
+  document
+    .querySelectorAll(".nav-item")
+    .forEach((nav) => nav.classList.remove("active"));
+  const active = document.getElementById(menuId);
+  if (active) {
+    active.classList.add("active");
+  }
+  localStorage.setItem(DASHBOARD_LAST_VIEW_KEY, menuId);
+}
+
+function getActiveMenuId() {
+  const saved = localStorage.getItem(DASHBOARD_LAST_VIEW_KEY);
+  const allowed = new Set([
+    "menu-overview",
+    "menu-alarms",
+    "menu-timers",
+    "menu-lists",
+    "menu-media",
+    "menu-profile",
+  ]);
+  return allowed.has(saved) ? saved : "menu-overview";
 }
 
 export function loadDashboard() {
@@ -31,7 +58,12 @@ export function loadDashboard() {
                     </button>
                     <h2 style="font-size: 1.2rem; margin:0;">Smart Speaker</h2>
                 </div>
-                <img src="/static/image/logo.png" alt="Logo" style="width: 32px; height: 32px; object-fit: contain;">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <button id="mobile-logout-btn" class="btn-icon text-danger" aria-label="Đăng xuất">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                    </button>
+                    <img src="/static/image/logo.png" alt="Logo" style="width: 32px; height: 32px; object-fit: contain;">
+                </div>
             </div>
 
             <!-- Overlay làm mờ background khi mở menu trên điện thoại -->
@@ -80,12 +112,15 @@ export function loadDashboard() {
         </div>
     `;
 
-  document.getElementById("btn-logout").addEventListener("click", () => {
+  const handleLogout = () => {
     showConfirm("Bạn có chắc chắn muốn đăng xuất tài khoản này không?", () => {
       clearSession();
       window.location.reload();
     });
-  });
+  };
+
+  document.getElementById("btn-logout").addEventListener("click", handleLogout);
+  document.getElementById("mobile-logout-btn").addEventListener("click", handleLogout);
 
   // Logic Đóng / Mở menu trên mobile
   const sidebar = document.getElementById("sidebar");
@@ -115,10 +150,7 @@ export function loadDashboard() {
     const el = document.getElementById(menu.id);
     if (el) {
       el.addEventListener("click", () => {
-        document
-          .querySelectorAll(".nav-item")
-          .forEach((nav) => nav.classList.remove("active"));
-        el.classList.add("active");
+        setActiveMenu(menu.id);
         menu.render();
         if (sidebar.classList.contains("open")) {
           sidebar.classList.remove("open");
@@ -128,15 +160,14 @@ export function loadDashboard() {
     }
   });
 
-  // Mặc định load Overview
-  renderOverview();
+  const initialMenuId = getActiveMenuId();
+  const initialMenu = menus.find((menu) => menu.id === initialMenuId) || menus[0];
+  setActiveMenu(initialMenu.id);
+  initialMenu.render();
 
   // Logo Click cũng về Overview
   document.getElementById("logo-btn").addEventListener("click", () => {
-    document
-      .querySelectorAll(".nav-item")
-      .forEach((nav) => nav.classList.remove("active"));
-    document.getElementById("menu-overview").classList.add("active");
+    setActiveMenu("menu-overview");
     renderOverview();
     if (sidebar.classList.contains("open")) {
       sidebar.classList.remove("open");
@@ -147,8 +178,17 @@ export function loadDashboard() {
 
 let cachedOverview = null;
 
+function resetDashboardScroll() {
+  const content = document.getElementById("main-content");
+  if (content) {
+    content.scrollTop = 0;
+  }
+  window.scrollTo(0, 0);
+}
+
 async function renderOverview(silent = false) {
   const content = document.getElementById("main-content");
+  resetDashboardScroll();
 
   const buildUI = (data) => {
     const { profile, activeAlarms, activeTimers, totalNotes, totalMedia } =
@@ -225,6 +265,7 @@ async function renderOverview(silent = false) {
     if (JSON.stringify(newData) !== JSON.stringify(cachedOverview)) {
       cachedOverview = newData;
       buildUI(newData);
+      resetDashboardScroll();
     }
   } catch (e) {
     if (!cachedOverview) {
@@ -234,6 +275,7 @@ async function renderOverview(silent = false) {
                     <p>Chọn một chức năng trên thanh menu bên trái để bắt đầu quản lý không gian của bạn.</p>
                 </div>
             `;
+      resetDashboardScroll();
     }
   }
 }

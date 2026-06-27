@@ -45,6 +45,7 @@ constexpr unsigned long kRegisterPromptRecheckMs = 3000;
 constexpr int kRfidBeepFreq = 900;
 constexpr int kRfidBeepMs = 80;
 constexpr unsigned long kGreetingDurationMs = 3000;
+constexpr unsigned long kWakewordPrepareMs = 60;
 
 enum class UiMode {
     Splash,
@@ -237,19 +238,44 @@ bool shouldShowWifiReconnect(UiMode uiMode,
     return false;
 }
 
+void prepareWakewordRuntime() {
+    runtime::clearPendingExternalAudioSessionState();
+    voiceBackendInvalidateCaptureToken();
+    runtime::resetAssistantPlaybackQueue();
+    runtime::resetBeepQueue();
+    runtime::resetStreamAudioQueue();
+    runtime::resetWakewordAudioQueue();
+    runtime::resetProfileLookupQueues();
+    runtime::storePlaybackAudio(nullptr, 0);
+    audioResetWsFrames();
+}
+
 void setUiMode(UiMode &uiMode, UiMode nextMode, unsigned long &lastUiFrameMs) {
+    const bool enteringWakeword = nextMode == UiMode::WaitWakeword;
+
     if (uiMode == nextMode) {
+        if (enteringWakeword) {
+            runtime::setAudioSessionMode(AudioSessionMode::Idle);
+            prepareWakewordRuntime();
+            vTaskDelay(pdMS_TO_TICKS(kWakewordPrepareMs));
+            runtime::setAudioSessionMode(AudioSessionMode::WaitWakeword);
+        }
         return;
     }
 
     Serial.printf("ui: %s -> %s\n", uiModeName(uiMode), uiModeName(nextMode));
+    if (enteringWakeword) {
+        runtime::setAudioSessionMode(AudioSessionMode::Idle);
+        prepareWakewordRuntime();
+        vTaskDelay(pdMS_TO_TICKS(kWakewordPrepareMs));
+    }
     uiMode = nextMode;
     runtime::setAudioSessionMode(audioSessionModeForUi(nextMode));
-    if (nextMode == UiMode::WaitWakeword) {
-        runtime::clearPendingExternalAudioSessionState();
-        voiceBackendInvalidateCaptureToken();
-    }
     lastUiFrameMs = 0;
+}
+
+void transitionToWakeword(UiMode &uiMode, unsigned long &lastUiFrameMs) {
+    setUiMode(uiMode, UiMode::WaitWakeword, lastUiFrameMs);
 }
 
 bool handleStartupUi(unsigned long splashStartedMs,
@@ -400,6 +426,18 @@ void networkTask(void *param) {
             continue;
         }
 
+        if (!runtime::isAudioSessionActive() || runtime::isWakewordDetectionActive()) {
+            if (streamingActive) {
+                streamingActive = false;
+                runtime::resetStreamAudioQueue();
+                audioResetWsFrames();
+            }
+            hasPlaybackRequest = false;
+            runtime::storePlaybackAudio(nullptr, 0);
+            vTaskDelay(pdMS_TO_TICKS(kUiSleepMs));
+            continue;
+        }
+
         wifiEnsureConnected();
         wsLoop();
 
@@ -499,6 +537,9 @@ void profileLookupTask(void *param) {
         while (scheduleAlertActive()) {
             vTaskDelay(pdMS_TO_TICKS(kUiSleepMs));
         }
+        while (runtime::isWakewordDetectionActive()) {
+            vTaskDelay(pdMS_TO_TICKS(kUiSleepMs));
+        }
 
         wifiEnsureConnected();
         scheduleAnnounceDevice(lookupRequest.uid);
@@ -506,11 +547,10 @@ void profileLookupTask(void *param) {
         lookupResult = {};
         copyText(lookupResult.uid, sizeof(lookupResult.uid), lookupRequest.uid);
         lookupResult.requestOk = profileFetchStatus(lookupRequest.uid, lookupResult.status);
-        runtime::publishProfileLookupResult(lookupResult);
         if (lookupResult.requestOk && profileIsComplete(lookupResult.status)) {
-            // Keep login/UI responsive; the schedule task can sync in the background.
-            scheduleRequestSync(lookupRequest.uid, "nfc_login");
+            scheduleSyncForUid(lookupRequest.uid, "nfc_login");
         }
+        runtime::publishProfileLookupResult(lookupResult);
     }
 }
 
@@ -603,7 +643,7 @@ void uiTask(void *param) {
             Serial.printf("active-mode: interrupted by nfc %s\n", uid);
             runtime::clearPendingExternalAudioSessionState();
             voiceBackendInvalidateCaptureToken();
-            setUiMode(uiMode, UiMode::Streaming, lastUiFrameMs);
+            transitionToWakeword(uiMode, lastUiFrameMs);
             continue;
         }
 
@@ -647,7 +687,7 @@ void uiTask(void *param) {
         if (uiMode == UiMode::Greeting &&
             greetingStartedMs > 0 &&
             now - greetingStartedMs >= kGreetingDurationMs) {
-            setUiMode(uiMode, UiMode::WaitWakeword, lastUiFrameMs);
+            transitionToWakeword(uiMode, lastUiFrameMs);
         }
 
         if (uiMode == UiMode::WaitWakeword && runtime::consumeWakewordTransition()) {
@@ -657,7 +697,11 @@ void uiTask(void *param) {
         const bool canApplyExternalState = uiModeCanApplyExternalAudioSessionState(uiMode);
         ExternalAudioSessionState nextExternalState = ExternalAudioSessionState::WaitWakeword;
         if (canApplyExternalState && runtime::consumeExternalAudioSessionState(nextExternalState)) {
-            setUiMode(uiMode, uiModeForExternalAudioSessionState(nextExternalState), lastUiFrameMs);
+            if (nextExternalState == ExternalAudioSessionState::WaitWakeword) {
+                transitionToWakeword(uiMode, lastUiFrameMs);
+            } else {
+                setUiMode(uiMode, uiModeForExternalAudioSessionState(nextExternalState), lastUiFrameMs);
+            }
         }
 
         if (lastUiFrameMs == 0 || now - lastUiFrameMs >= kUiIntervalMs) {
@@ -722,6 +766,10 @@ void beepTask(void *param) {
         }
 
         if (!runtime::waitBeep(request, portMAX_DELAY)) {
+            continue;
+        }
+
+        if (runtime::isAudioSessionActive()) {
             continue;
         }
 
