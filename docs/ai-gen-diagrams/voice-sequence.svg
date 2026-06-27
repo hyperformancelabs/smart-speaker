@@ -1,0 +1,143 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="980" viewBox="0 0 1600 980" role="img" aria-labelledby="title desc">
+  <title id="title">Voice Interaction Sequence</title>
+  <desc id="desc">Sequence diagram for one smart speaker voice turn from wakeword detection, audio streaming, backend VAD, STT, single-turn ReAct agent, tools, TTS, and ESP playback.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#202020"/>
+    </marker>
+    <style>
+      .title { font: 700 48px Arial, sans-serif; fill: #111; }
+      .subtitle { font: 400 18px Arial, sans-serif; fill: #333; }
+      .laneHead { fill: #fafafa; stroke: #202020; stroke-width: 2.5; }
+      .laneLine { stroke: #999; stroke-width: 2; stroke-dasharray: 8 8; }
+      .actor { font: 700 23px Arial, sans-serif; fill: #111; }
+      .event { fill: #fff; stroke: #202020; stroke-width: 2.5; }
+      .eventSoft { fill: #fafafa; stroke: #555; stroke-width: 2; }
+      .eventText { font: 700 17px Arial, sans-serif; fill: #111; }
+      .small { font: 400 14px Arial, sans-serif; fill: #333; }
+      .msg { font: 400 15px Arial, sans-serif; fill: #222; }
+      .line { stroke: #202020; stroke-width: 2.8; fill: none; marker-end: url(#arrow); }
+      .return { stroke: #555; stroke-width: 2.5; fill: none; stroke-dasharray: 7 6; marker-end: url(#arrow); }
+      .note { fill: #fafafa; stroke: #777; stroke-width: 1.5; }
+      .noteText { font: 400 15px Arial, sans-serif; fill: #222; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="980" fill="#fff"/>
+
+  <text x="80" y="70" class="title">Voice Sequence</text>
+  <text x="80" y="104" class="subtitle">One single-turn voice interaction: edge wakeword starts capture, backend detects speech, AI decides, tools execute, TTS/media returns to ESP.</text>
+
+  <!-- Actor headers -->
+  <rect x="70" y="145" width="230" height="64" rx="10" class="laneHead"/>
+  <rect x="380" y="145" width="230" height="64" rx="10" class="laneHead"/>
+  <rect x="690" y="145" width="230" height="64" rx="10" class="laneHead"/>
+  <rect x="1000" y="145" width="230" height="64" rx="10" class="laneHead"/>
+  <rect x="1310" y="145" width="230" height="64" rx="10" class="laneHead"/>
+
+  <text x="185" y="185" text-anchor="middle" class="actor">User</text>
+  <text x="495" y="185" text-anchor="middle" class="actor">ESP32 Edge</text>
+  <text x="805" y="185" text-anchor="middle" class="actor">Voice Backend</text>
+  <text x="1115" y="185" text-anchor="middle" class="actor">AI Agent / Tools</text>
+  <text x="1425" y="185" text-anchor="middle" class="actor">DB / External</text>
+
+  <!-- Lane lines -->
+  <path d="M185 209 L185 870" class="laneLine"/>
+  <path d="M495 209 L495 870" class="laneLine"/>
+  <path d="M805 209 L805 870" class="laneLine"/>
+  <path d="M1115 209 L1115 870" class="laneLine"/>
+  <path d="M1425 209 L1425 870" class="laneLine"/>
+
+  <!-- Sequence events -->
+  <rect x="90" y="245" width="190" height="58" rx="10" class="event"/>
+  <text x="185" y="270" text-anchor="middle" class="eventText">Say wake word</text>
+  <text x="185" y="292" text-anchor="middle" class="small">local trigger phrase</text>
+  <path d="M280 274 L405 274" class="line"/>
+  <text x="342" y="255" text-anchor="middle" class="msg">voice</text>
+
+  <rect x="405" y="245" width="180" height="58" rx="10" class="event"/>
+  <text x="495" y="270" text-anchor="middle" class="eventText">Wakeword detect</text>
+  <text x="495" y="292" text-anchor="middle" class="small">Edge Impulse on ESP32</text>
+
+  <path d="M495 303 L495 342" class="line"/>
+  <rect x="392" y="342" width="206" height="64" rx="10" class="eventSoft"/>
+  <text x="495" y="368" text-anchor="middle" class="eventText">Start capture</text>
+  <text x="495" y="390" text-anchor="middle" class="small">capture_token + NFC tag</text>
+
+  <path d="M598 374 L690 374" class="line"/>
+  <text x="644" y="355" text-anchor="middle" class="msg">POST /api/audio/start</text>
+
+  <rect x="704" y="342" width="202" height="64" rx="10" class="event"/>
+  <text x="805" y="368" text-anchor="middle" class="eventText">Create capture</text>
+  <text x="805" y="390" text-anchor="middle" class="small">connect to ESP WebSocket</text>
+
+  <path d="M805 406 L805 445" class="line"/>
+  <path d="M805 445 L585 445" class="return"/>
+  <text x="695" y="428" text-anchor="middle" class="msg">WS connect + hello</text>
+
+  <rect x="392" y="475" width="206" height="70" rx="10" class="event"/>
+  <text x="495" y="501" text-anchor="middle" class="eventText">Stream PCM packets</text>
+  <text x="495" y="523" text-anchor="middle" class="small">320 samples = 20ms</text>
+  <path d="M598 510 L704 510" class="line"/>
+  <text x="651" y="492" text-anchor="middle" class="msg">WebSocket binary audio</text>
+
+  <rect x="704" y="475" width="202" height="70" rx="10" class="event"/>
+  <text x="805" y="501" text-anchor="middle" class="eventText">VAD + EoS</text>
+  <text x="805" y="523" text-anchor="middle" class="small">Silero first utterance</text>
+
+  <rect x="704" y="590" width="202" height="62" rx="10" class="event"/>
+  <text x="805" y="616" text-anchor="middle" class="eventText">STT transcript</text>
+  <text x="805" y="638" text-anchor="middle" class="small">Groq Whisper</text>
+  <path d="M805 545 L805 590" class="line"/>
+
+  <path d="M906 621 L1000 621" class="line"/>
+  <text x="953" y="603" text-anchor="middle" class="msg">transcript</text>
+
+  <rect x="1013" y="590" width="204" height="62" rx="10" class="event"/>
+  <text x="1115" y="616" text-anchor="middle" class="eventText">Single-turn ReAct</text>
+  <text x="1115" y="638" text-anchor="middle" class="small">route, decide, respond</text>
+
+  <path d="M1217 621 L1310 621" class="line"/>
+  <text x="1264" y="603" text-anchor="middle" class="msg">tool calls if needed</text>
+
+  <rect x="1332" y="590" width="186" height="62" rx="10" class="eventSoft"/>
+  <text x="1425" y="616" text-anchor="middle" class="eventText">DB / APIs</text>
+  <text x="1425" y="638" text-anchor="middle" class="small">profile, media, lists, web</text>
+
+  <path d="M1310 660 L1217 660" class="return"/>
+  <text x="1264" y="683" text-anchor="middle" class="msg">tool results</text>
+
+  <rect x="1013" y="720" width="204" height="62" rx="10" class="event"/>
+  <text x="1115" y="746" text-anchor="middle" class="eventText">Compose answer</text>
+  <text x="1115" y="768" text-anchor="middle" class="small">response text + commands</text>
+  <path d="M1115 652 L1115 720" class="line"/>
+
+  <path d="M1013 751 L906 751" class="line"/>
+  <text x="960" y="733" text-anchor="middle" class="msg">assistant output</text>
+
+  <rect x="704" y="720" width="202" height="62" rx="10" class="event"/>
+  <text x="805" y="746" text-anchor="middle" class="eventText">TTS + ESP payload</text>
+  <text x="805" y="768" text-anchor="middle" class="small">assistant_playback JSON</text>
+
+  <path d="M704 751 L598 751" class="return"/>
+  <text x="651" y="733" text-anchor="middle" class="msg">state + TTS/media URL</text>
+
+  <rect x="392" y="720" width="206" height="62" rx="10" class="event"/>
+  <text x="495" y="746" text-anchor="middle" class="eventText">Speak / play media</text>
+  <text x="495" y="768" text-anchor="middle" class="small">OLED + speaker output</text>
+
+  <path d="M392 751 L280 751" class="return"/>
+  <text x="336" y="733" text-anchor="middle" class="msg">audio response</text>
+
+  <rect x="90" y="720" width="190" height="62" rx="10" class="eventSoft"/>
+  <text x="185" y="746" text-anchor="middle" class="eventText">Hear response</text>
+  <text x="185" y="768" text-anchor="middle" class="small">TTS, music, or guidance</text>
+
+  <path d="M495 782 L495 835" class="line"/>
+  <rect x="392" y="835" width="206" height="46" rx="10" class="eventSoft"/>
+  <text x="495" y="864" text-anchor="middle" class="eventText">Return to wakeword</text>
+
+  <!-- Notes -->
+  <rect x="70" y="900" width="1460" height="48" rx="10" class="note"/>
+  <text x="100" y="930" class="noteText">Key point: wakeword runs locally on ESP32. After that, the backend owns VAD, STT, AI/tool execution, TTS/media preparation, and sends compact control JSON back to the device.</text>
+</svg>

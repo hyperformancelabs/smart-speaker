@@ -1,0 +1,151 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <defs>
+    <style>
+      .title { font: 700 48px Arial, sans-serif; fill: #111; }
+      .subtitle { font: 400 22px Arial, sans-serif; fill: #333; }
+      .axis { font: 700 19px Arial, sans-serif; fill: #111; }
+      .task { font: 700 20px Arial, sans-serif; fill: #111; }
+      .text { font: 400 17px Arial, sans-serif; fill: #111; }
+      .tiny { font: 400 14px Arial, sans-serif; fill: #111; }
+      .grid { stroke: #bbb; stroke-width: 1.2; stroke-dasharray: 6 8; }
+      .rule { stroke: #111; stroke-width: 2; }
+      .box { fill: #fff; stroke: #111; stroke-width: 2.4; rx: 8; }
+      .bar { fill: #fff; stroke: #111; stroke-width: 2.2; rx: 7; }
+      .bar-dash { fill: #fff; stroke: #111; stroke-width: 2.2; stroke-dasharray: 8 6; rx: 7; }
+      .note { fill: #fff; stroke: #111; stroke-width: 2; rx: 8; }
+      .arrow { stroke: #111; stroke-width: 2.2; fill: none; marker-end: url(#arrow); }
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#111" />
+    </marker>
+  </defs>
+
+  <text x="800" y="58" text-anchor="middle" class="title">ESP32 RTOS Execution Timeline</text>
+  <text x="800" y="94" text-anchor="middle" class="subtitle">A Gantt-style view of task activity, audio session states, and backend communication.</text>
+
+  <!-- Layout constants: chart x=250, width=1230, phase width=175 -->
+  <line x1="250" y1="160" x2="1480" y2="160" class="rule" />
+  <line x1="250" y1="780" x2="1480" y2="780" class="rule" />
+
+  <!-- Vertical grid -->
+  <line x1="250" y1="160" x2="250" y2="780" class="rule" />
+  <line x1="425" y1="160" x2="425" y2="780" class="grid" />
+  <line x1="600" y1="160" x2="600" y2="780" class="grid" />
+  <line x1="775" y1="160" x2="775" y2="780" class="grid" />
+  <line x1="950" y1="160" x2="950" y2="780" class="grid" />
+  <line x1="1125" y1="160" x2="1125" y2="780" class="grid" />
+  <line x1="1300" y1="160" x2="1300" y2="780" class="grid" />
+  <line x1="1480" y1="160" x2="1480" y2="780" class="rule" />
+
+  <!-- Phase labels -->
+  <text x="337" y="140" text-anchor="middle" class="axis">Boot</text>
+  <text x="512" y="140" text-anchor="middle" class="axis">NFC Login</text>
+  <text x="687" y="140" text-anchor="middle" class="axis">Wait Wakeword</text>
+  <text x="862" y="140" text-anchor="middle" class="axis">Streaming</text>
+  <text x="1037" y="140" text-anchor="middle" class="axis">Thinking</text>
+  <text x="1212" y="140" text-anchor="middle" class="axis">Speaking</text>
+  <text x="1390" y="140" text-anchor="middle" class="axis">Back to Wakeword</text>
+
+  <!-- Row guides and labels -->
+  <text x="70" y="210" class="task">uiTask</text>
+  <text x="70" y="290" class="task">audio_capture</text>
+  <text x="70" y="370" class="task">wakeword</text>
+  <text x="70" y="450" class="task">network</text>
+  <text x="70" y="530" class="task">profile_lookup</text>
+  <text x="70" y="610" class="task">schedule</text>
+  <text x="70" y="690" class="task">beep</text>
+  <text x="70" y="760" class="task">backend link</text>
+
+  <line x1="250" y1="235" x2="1480" y2="235" class="grid" />
+  <line x1="250" y1="315" x2="1480" y2="315" class="grid" />
+  <line x1="250" y1="395" x2="1480" y2="395" class="grid" />
+  <line x1="250" y1="475" x2="1480" y2="475" class="grid" />
+  <line x1="250" y1="555" x2="1480" y2="555" class="grid" />
+  <line x1="250" y1="635" x2="1480" y2="635" class="grid" />
+  <line x1="250" y1="715" x2="1480" y2="715" class="grid" />
+
+  <!-- uiTask -->
+  <rect x="260" y="178" width="155" height="46" class="bar" />
+  <text x="337" y="207" text-anchor="middle" class="text">startup UI</text>
+  <rect x="430" y="178" width="160" height="46" class="bar" />
+  <text x="510" y="207" text-anchor="middle" class="text">profile UI</text>
+  <rect x="605" y="178" width="165" height="46" class="bar" />
+  <text x="687" y="207" text-anchor="middle" class="text">sleep screen</text>
+  <rect x="780" y="178" width="165" height="46" class="bar" />
+  <text x="862" y="207" text-anchor="middle" class="text">stream face</text>
+  <rect x="955" y="178" width="165" height="46" class="bar" />
+  <text x="1037" y="207" text-anchor="middle" class="text">thinking face</text>
+  <rect x="1130" y="178" width="165" height="46" class="bar" />
+  <text x="1212" y="207" text-anchor="middle" class="text">speaking face</text>
+  <rect x="1305" y="178" width="165" height="46" class="bar" />
+  <text x="1387" y="207" text-anchor="middle" class="text">sleep screen</text>
+
+  <!-- audio_capture -->
+  <rect x="605" y="258" width="165" height="46" class="bar" />
+  <text x="687" y="287" text-anchor="middle" class="text">mic capture</text>
+  <rect x="780" y="258" width="165" height="46" class="bar" />
+  <text x="862" y="287" text-anchor="middle" class="text">mic to stream</text>
+  <rect x="955" y="258" width="165" height="46" class="bar" />
+  <text x="1037" y="287" text-anchor="middle" class="text">capture route</text>
+  <rect x="1305" y="258" width="165" height="46" class="bar" />
+  <text x="1387" y="287" text-anchor="middle" class="text">mic capture</text>
+
+  <!-- wakeword -->
+  <rect x="605" y="338" width="165" height="46" class="bar" />
+  <text x="687" y="367" text-anchor="middle" class="text">edge inference</text>
+  <rect x="1305" y="338" width="165" height="46" class="bar" />
+  <text x="1387" y="367" text-anchor="middle" class="text">edge inference</text>
+
+  <!-- network -->
+  <rect x="780" y="418" width="165" height="46" class="bar" />
+  <text x="862" y="447" text-anchor="middle" class="text">start + stream</text>
+  <rect x="955" y="418" width="165" height="46" class="bar" />
+  <text x="1037" y="447" text-anchor="middle" class="text">WS control</text>
+  <rect x="1130" y="418" width="165" height="46" class="bar" />
+  <text x="1212" y="447" text-anchor="middle" class="text">play TTS/media</text>
+
+  <!-- profile lookup -->
+  <rect x="430" y="498" width="160" height="46" class="bar" />
+  <text x="510" y="527" text-anchor="middle" class="text">fetch profile</text>
+  <rect x="590" y="498" width="95" height="46" class="bar" />
+  <text x="637" y="527" text-anchor="middle" class="tiny">sync</text>
+
+  <!-- schedule -->
+  <rect x="430" y="578" width="255" height="46" class="bar-dash" />
+  <text x="557" y="607" text-anchor="middle" class="text">announce + schedule sync</text>
+  <rect x="955" y="578" width="165" height="46" class="bar-dash" />
+  <text x="1037" y="607" text-anchor="middle" class="text">defer if wakeword</text>
+  <rect x="1130" y="578" width="165" height="46" class="bar-dash" />
+  <text x="1212" y="607" text-anchor="middle" class="text">alert may pause</text>
+
+  <!-- beep -->
+  <rect x="430" y="658" width="70" height="46" class="bar" />
+  <text x="465" y="687" text-anchor="middle" class="tiny">NFC</text>
+  <rect x="605" y="658" width="70" height="46" class="bar-dash" />
+  <text x="640" y="687" text-anchor="middle" class="tiny">wake</text>
+  <rect x="1130" y="658" width="70" height="46" class="bar-dash" />
+  <text x="1165" y="687" text-anchor="middle" class="tiny">alert</text>
+  <text x="1220" y="687" class="tiny">skipped when audio session is active</text>
+
+  <!-- backend link -->
+  <rect x="780" y="728" width="165" height="40" class="bar" />
+  <text x="862" y="753" text-anchor="middle" class="tiny">POST /api/audio/start</text>
+  <rect x="830" y="768" width="115" height="0" class="bar" />
+  <rect x="955" y="728" width="165" height="40" class="bar" />
+  <text x="1037" y="753" text-anchor="middle" class="tiny">control JSON</text>
+  <rect x="1130" y="728" width="165" height="40" class="bar" />
+  <text x="1212" y="753" text-anchor="middle" class="tiny">assistant_playback</text>
+
+  <!-- Communication arrows -->
+  <path d="M687 384 C690 410 765 408 780 438" class="arrow" />
+  <text x="690" y="420" class="tiny">wake signal</text>
+
+  <path d="M862 464 C862 520 862 690 862 728" class="arrow" />
+  <path d="M1037 728 C1037 648 1037 520 1037 464" class="arrow" />
+  <path d="M1212 728 C1212 655 1212 520 1212 464" class="arrow" />
+
+  <!-- Legend / interpretation -->
+  <rect x="80" y="810" width="1440" height="58" class="note" />
+  <text x="110" y="837" class="text">How to read: each row is one FreeRTOS task. Solid bars mean active work; dashed bars mean event-driven or deferred work.</text>
+  <text x="110" y="860" class="text">The design keeps wakeword inference on the audio core, server communication on the network task, and UI state transitions in one owner task.</text>
+</svg>
