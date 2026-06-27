@@ -213,4 +213,4 @@ Detailed docs:
 
 ## License
 
-[MIT](LICENSE) © 2026 Hyperformance Labs.
+[AGPL v3](LICENSE) © 2026 Hyperformance Labs.
